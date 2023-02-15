@@ -40,6 +40,8 @@
 #include <iostream>
 
 
+
+
 NS_LOG_COMPONENT_DEFINE ("THzPhyMacro");
 
 namespace ns3 {
@@ -57,6 +59,7 @@ THzPhyMacro::THzPhyMacro ()
   m_csBusyEnd = Seconds (0);
   m_state = IDLE;
   Simulator::ScheduleNow (&THzPhyMacro::CalTxPsd, this);
+  m_useRefinement=0; //added
 }
 
 
@@ -142,6 +145,7 @@ THzPhyMacro::GetTypeId (void)
                    DoubleValue (315.52e9),
                    MakeDoubleAccessor (&THzPhyMacro::m_dataRate64QAM),
                    MakeDoubleChecker<double> ())
+  
   ;
   return tid;
 }
@@ -239,11 +243,11 @@ THzPhyMacro::GetTxPower ()
 bool
 THzPhyMacro::SendPacket (Ptr<Packet> packet, bool rate, uint16_t mcs)
 {
-  NS_LOG_FUNCTION (" from node " << m_device->GetNode ()->GetId () << " state " << (m_state));
+  NS_LOG_UNCOND (" from node " << m_device->GetNode ()->GetId () << " state " << (m_state));
   // RX might be interrupted by TX, but not vice versa
   if (m_state == TX)
     {
-      NS_LOG_DEBUG ("Already in transmission mode");
+      NS_LOG_UNCOND ("Already in transmission mode");
       return false;
     }
   m_state = TX;
@@ -295,9 +299,10 @@ THzPhyMacro::ReceivePacket (Ptr<Packet> packet, Time txDuration, double_t rxPowe
 
   if (m_state == TX)
     {
-      NS_LOG_INFO ("Now transmitting Drop packet due to half-duplex");
+      NS_LOG_UNCOND ("Now transmitting Drop packet due to half-duplex");
       return;
     }
+
   // Start RX when energy is bigger than carrier sense threshold
   Time txEnd = Simulator::Now () + txDuration;
   if (rxPower > m_csTh && txEnd > m_csBusyEnd)
@@ -306,9 +311,10 @@ THzPhyMacro::ReceivePacket (Ptr<Packet> packet, Time txDuration, double_t rxPowe
         {
           m_csBusy = true;
           m_pktRx = packet;
-          //NS_LOG_UNCOND(m_device->GetNode ()->GetId () << ": Packet received. rxPower: " << rxPower << ", threshold: " << m_csTh);
-
+          NS_LOG_UNCOND(m_device->GetNode ()->GetId () << ": Packet received. rxPower: " << rxPower << ", threshold: " << m_csTh);
+         
           m_mac->ReceivePacket (this, packet);
+         NS_LOG_UNCOND("Node " << m_device->GetNode ()->GetId () << ": Everything looks good, sending packet to upper layer i.e. MAC at time " << Simulator::Now());
         }
       m_state = RX;
       m_csBusyEnd = txEnd;
@@ -316,6 +322,8 @@ THzPhyMacro::ReceivePacket (Ptr<Packet> packet, Time txDuration, double_t rxPowe
   if (rxPower < m_csTh)
     {
       NS_LOG_INFO ("rxPower < m_csTh");
+      NS_LOG_UNCOND("Node " << m_device->GetNode ()->GetId ()  << ": Not enough power. rxPower: " << rxPower << ", threshold: " << m_csTh << Simulator::Now() << "#####");//added
+     
       /*if (rxPower > m_csTh - 10){
         NS_LOG_UNCOND(m_device->GetNode ()->GetId () << ": Not enough power. rxPower: " << rxPower << ", threshold: " << m_csTh);
       }*/
@@ -328,7 +336,7 @@ THzPhyMacro::ReceivePacket (Ptr<Packet> packet, Time txDuration, double_t rxPowe
 void
 THzPhyMacro::ReceivePacketDone (Ptr<Packet> packet, double rxPower)
 {
-  NS_LOG_FUNCTION ("at node " << m_device->GetNode ()->GetId () << "csBusy " << m_csBusyEnd << " now " << Simulator::Now () << " state " << (m_state));
+  NS_LOG_UNCOND (" THzPhyMacro::ReceivePacketDone at node " << m_device->GetNode ()->GetId () << "csBusy " << m_csBusyEnd << " now " << Simulator::Now () << " state " << (m_state));
 
   if (m_csBusyEnd <= Simulator::Now () + NanoSeconds (1))
     {
@@ -336,8 +344,8 @@ THzPhyMacro::ReceivePacketDone (Ptr<Packet> packet, double rxPower)
     }
   if (m_state != RX)
     {
-      NS_LOG_INFO ("Drop packet due to state");
-      NS_LOG_DEBUG ("Current Status " << (m_state) << " Need Status RX ");
+      NS_LOG_UNCOND ("Drop packet due to state at node " << m_device->GetNode ()->GetId () << "!!!!!");
+      NS_LOG_UNCOND ("Current Status " << (m_state) << " Need Status RX ");
       return;
     }
 
@@ -350,7 +358,7 @@ THzPhyMacro::ReceivePacketDone (Ptr<Packet> packet, double rxPower)
           if (it->packet != m_pktRx &&  (Simulator::Now () - it->rxStart) <= it->rxDuration)
             {
               interference += DbmToW (it->rxPower);
-              //NS_LOG_UNCOND("Interference at " << m_device->GetNode ()->GetId () << " of " << it->rxPower << " W");
+              NS_LOG_UNCOND("Interference at " << m_device->GetNode ()->GetId () << " of " << it->rxPower << " W");
             }
         }
 
@@ -362,15 +370,19 @@ THzPhyMacro::ReceivePacketDone (Ptr<Packet> packet, double rxPower)
       NS_LOG_DEBUG ("SINR = " << sinrDb << " dB; SINR TH = " << m_sinrTh << " dB");
       // ADD: CHANGE STATUS
       m_state = IDLE;
-      //NS_LOG_UNCOND(m_device->GetNode ()->GetId () << ": SINR = " << sinrDb << " dB; SINR TH = " << m_sinrTh << " dB");
+      NS_LOG_UNCOND(m_device->GetNode ()->GetId () << ": SINR = " << sinrDb << " dB; SINR TH = " << m_sinrTh << " dB");
       if (sinrDb > m_sinrTh)
         {
+          NS_LOG_UNCOND("-----------------------------------------------------------------------------------");
+          NS_LOG_UNCOND("Phy Receive Packet Done returns true at node " << m_device->GetNode ()->GetId ()<< "           |");
+          NS_LOG_UNCOND("-----------------------------------------------------------------------------------");
           m_state = IDLE;
           m_mac->ReceivePacketDone (this, packet, true, rxPower);
           return;
         }
       else
         {
+          NS_LOG_UNCOND("Phy Receive Packet Done returns false at node " << m_device->GetNode ()->GetId ());
           m_mac->ReceivePacketDone (this,packet,false, rxPower);
         }
 
@@ -415,5 +427,7 @@ THzPhyMacro::DbmToW (double dbm)
   double mw = pow (10.0,dbm / 10.0);
   return mw / 1000.0;
 }
+
+ 
 
 } // namespace ns3

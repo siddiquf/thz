@@ -18,7 +18,11 @@
  * Author: Qing Xia <qingxia@buffalo.edu>
  *         Zahed Hossain <zahedhos@buffalo.edu>
  *         Josep Miquel Jornet <j.jornet@northeastern.edu>
+ *
+ * Modified by: Farhan Siddiqui <farhansi@gmail.com>
+             Bikash Muzamdar <bikashmazumdar2000@gmail.com>
  */
+
 
 #ifndef THZ_DIR_ANTENNA_H
 #define THZ_DIR_ANTENNA_H
@@ -168,6 +172,7 @@ public:
     * \param XnodeMode the operation mode of the node X.
     * \param YnodeMode the operation mode of the node Y.
     * \param RxorientationRadians the orientation of the receiver node in radians.
+    * \param TxorientationRadians the orientation of the transmitter node in radians.
     *
     * \brief calculate the total directional antenna's gain between transmitter and receiver [dB].
     *
@@ -175,8 +180,40 @@ public:
     * Antenna mode = 0 corresponding to Directional transmitter.
     * Antenna mode = 2 corresponding to Omni-directional antenna.
     */
-  double GetAntennaGain (Ptr<MobilityModel> XnodeMobility, Ptr<MobilityModel> YnodeMobility, bool XnodeMode, bool YnodeMode, double RxorientationRadians);
+  double GetAntennaGain (Ptr<MobilityModel> XnodeMobility, Ptr<MobilityModel> YnodeMobility, bool XnodeMode, bool YnodeMode, double RxorientationRadians,double TxorientationRadians );
 
+
+/**
+ Methods for transmitter rotatation
+**/
+
+/**
+  * \param txTurnSpeed the turning speed of the transmitter directional antenna
+  *
+  * \brief set the turning speed of the directional antenna on the transmitter [circles/sec]
+  *
+  * transmitter's directional antenna periodically sweeps the entire area to discover AP.
+  */
+void SetTxTurningSpeed (double txTurnSpeed);
+
+/**
+ * \brief get the turning speed of the directional antenna on the transmitter [circles/sec]
+ */
+double GetTxTurningSpeed () const;
+
+/**
+  * \param phi_zero initial angle in phi-plane
+  *
+  * \brief tune the orientation of the transmitter's directional antenna
+  */
+void TuneTxOrientation (double phi_zero);
+
+/**
+  * \brief check the orientation of the transmitter's directional antenna based on time duration
+  *
+  * returns a orientation of smoothly turing directional antenna
+  */
+double GetTxOrientation ();
 
 private:
   Ptr<THzNetDevice> m_device;
@@ -186,6 +223,7 @@ private:
 
   double m_turnSpeed;
   double m_RxIniAngle;
+  double m_TxIniAngle; //orientation angle of default transmitter (client)
   double m_exponent;
   double m_beamwidthRadians;
   double m_beamwidthDegrees;
@@ -216,6 +254,10 @@ private:
   double m_TxGain;
   double m_rxGain;
   double m_txGain;
+
+  // TX antenna variables
+  double m_txTurnSpeed;
+
 
 };
 

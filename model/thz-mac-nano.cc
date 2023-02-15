@@ -889,5 +889,13 @@ THzMacNano::IsNewSequence (Mac48Address addr, uint16_t seq)
   return true;
 }
 
+void
+THzMacNano::CheckPacketPower (Ptr<THzPhy> phy, Ptr<Packet> packet, double_t rxPower, double_t rxPower_th)
+{
+
+  
+
+}
+
 
 } // namespace ns3

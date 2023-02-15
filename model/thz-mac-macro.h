@@ -207,7 +207,7 @@ public:
 private:
   typedef enum
   {
-    IDLE, BACKOFF, WAIT_TX, TX, WAIT_RX, RX, COLL
+    IDLE, BACKOFF, WAIT_TX, TX, WAIT_RX, RX, COLL, AP_DISCOVERY
   } State;
 
   Time GetSifs (void) const;
@@ -489,6 +489,7 @@ private:
   TracedCallback<uint32_t, uint32_t> m_traceEnqueue;
   TracedCallback<uint32_t, uint32_t, bool> m_traceSendDataDone;
   TracedCallback<double> m_traceThroughput;
+
 
 
 protected:

@@ -1087,4 +1087,6 @@ THzMacMacro::ResultsRecord ()
  
 
 }
+
+
 } // namespace ns3

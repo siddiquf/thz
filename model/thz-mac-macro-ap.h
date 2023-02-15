@@ -159,7 +159,7 @@ public:
 private:
   typedef enum
   {
-    IDLE, BACKOFF, WAIT_TX, TX, WAIT_ACK, RX, COLL
+    IDLE, BACKOFF, WAIT_TX, TX, WAIT_ACK, RX, COLL, AP_DISCOVERY, AP_DISCOVERY_2
   } State;
 
   Time GetSifs (void) const;
@@ -347,6 +347,8 @@ private:
   double csth_8PSK;
   double csth_16QAM;
   double csth_64QAM;
+
+
 
 
 protected:

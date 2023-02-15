@@ -19,6 +19,10 @@
  *         Zahed Hossain <zahedhos@buffalo.edu>
  *         Josep Miquel Jornet <j.jornet@northeastern.edu>
  *         Daniel Morales <danimoralesbrotons@gmail.com>
+ *
+ * Modified by: Farhan Siddiqui <farhansi@gmail.com>
+             Bikash Muzamdar <bikashmazumdar2000@gmail.com>
+ 
  */
 
 #include "ns3/packet.h"
@@ -69,6 +73,7 @@ THzChannel::GetTypeId ()
 THzChannel::THzChannel ()
   : Channel ()
 {
+  NS_LOG_UNCOND(" THzChannel::THzChannel constructor");
 }
 THzChannel::~THzChannel ()
 {
@@ -92,13 +97,14 @@ THzChannel::GetDevice (std::size_t i) const
 void
 THzChannel::AddDevice (Ptr<THzNetDevice> dev, Ptr<THzPhy> phy)
 {
-  NS_LOG_INFO ("CH: Adding dev/phy pair number " << m_devList.size () + 1);
+  NS_LOG_UNCOND ("CH: Adding dev/phy pair number " << m_devList.size () + 1);
   m_devList.push_back (std::make_pair (dev, phy));
 }
 
 bool
 THzChannel::SendPacket (Ptr<THzSpectrumSignalParameters> txParams)
 {
+  NS_LOG_UNCOND("THzChannel::SendPacket");
   NS_LOG_FUNCTION ("");
   Ptr<MobilityModel> XnodeMobility = 0; // initiation
   Ptr<MobilityModel> YnodeMobility = 0;   // initiation
@@ -107,43 +113,65 @@ THzChannel::SendPacket (Ptr<THzSpectrumSignalParameters> txParams)
   NoiseEntry ne;
   ne.packet = txParams->packet;
   ne.txDuration = txParams->txDuration;
+  NS_LOG_UNCOND("m_devList.size() is  " << m_devList.size());
   THzDeviceList::const_iterator it = m_devList.begin ();
+  int count = 0;
   for (; it != m_devList.end (); it++)
     {
       if (txParams->txPhy == it->second)
         {
+          count ++;
+          NS_LOG_UNCOND("sender is node " << it->first->GetNode ()->GetId());
           m_sendDev = it->first;
           XnodeMobility = it->first->GetNode ()->GetObject<MobilityModel> ();
-          m_XnodeMode = it->first->GetDirAntenna ()->CheckAntennaMode ();
+          m_XnodeMode = it->first->GetDirAntenna ()->CheckAntennaMode (); // m_XnodeMode is antenna mode set for sender node
+          // NS_LOG_UNCOND("m_XnodeMode is " << m_XnodeMode);
           m_thzDA = it->first->GetDirAntenna ();
           break;
         }
     }
+  NS_LOG_UNCOND("sender count is " << count);
   Simulator::Schedule (txParams->txDuration, &THzChannel::SendPacketDone, this, txParams->txPhy, txParams->packet);
   uint32_t j = 0;
   THzDeviceList::const_iterator itt = m_devList.begin ();
+  count = 0;
+  double old_tx = 999;
+  int dev_index = 1;
   for (; itt != m_devList.end (); itt++)
     {
       if (txParams->txPhy != itt->second)
         {
+          
           YnodeMobility = itt->first->GetNode ()->GetObject<MobilityModel> ();
           m_YnodeMode = itt->first->GetDirAntenna ()->CheckAntennaMode ();
+   
           Time delay = m_delay->GetDelay (XnodeMobility, YnodeMobility); // propagation delay
+          
           if (m_XnodeMode == 1 && m_YnodeMode == 0) // 1--Receiver; 0--Transmitter
             {
-              m_Rxorientation = m_thzDA->CheckRxOrientation ();  // turning sector by sector
+              NS_LOG_DEBUG("receiver is node " << itt->first->GetNode ()->GetId());
+              m_Rxorientation = m_thzDA->CheckRxOrientation ();  
+              NS_LOG_DEBUG("m_Rxorientation is " << m_Rxorientation);
+              m_Txorientation[dev_index] = itt->first->GetDirAntenna ()->CheckTxOrientation (); 
+     
+              count++; 
             }
-          if (m_XnodeMode == 0 && m_YnodeMode == 1)
+          if (m_XnodeMode == 0 && m_YnodeMode == 1) 
             {
-              m_Rxorientation = itt->first->GetDirAntenna ()->CheckRxOrientation ();
+
+              NS_LOG_DEBUG(" receiver is node " << itt->first->GetNode ()->GetId());
+              m_Rxorientation = itt->first->GetDirAntenna ()->CheckRxOrientation (); // itt->first->GetDirAntenna () gives antenna of receiver here ig (which is AP)
+              NS_LOG_DEBUG("m_Rxorientation is " << m_Rxorientation);
+              m_Txorientation[dev_index] = m_thzDA->CheckTxOrientation (); //trying 
             }
           if (m_XnodeMode == 2 && m_YnodeMode == 2)
             {
               m_Rxorientation = 0;
             }
-          m_totalGain = itt->first->GetDirAntenna ()->GetAntennaGain (XnodeMobility, YnodeMobility, m_XnodeMode, m_YnodeMode, m_Rxorientation);
+          NS_LOG_DEBUG("------>>>> m_Txorientation[dev_index] is " << m_Txorientation[dev_index]);
+          m_totalGain = itt->first->GetDirAntenna ()->GetAntennaGain (XnodeMobility, YnodeMobility, m_XnodeMode, m_YnodeMode, m_Rxorientation, m_Txorientation[dev_index]);
           double rxPower = m_loss->CalcRxPowerDA (txParams, XnodeMobility, YnodeMobility, m_totalGain);
-          NS_LOG_DEBUG ("node " << it->first->GetNode ()->GetId () << "->" << itt->first->GetNode ()->GetId () << ", txPower = " << txParams->txPower << " dBm, totalGain = " << m_totalGain + 30 << " dBm, rxPower = " << rxPower << " dBm" << "  now: " << Simulator::Now ());
+
           uint32_t dstNodeId = itt->first->GetNode ()->GetId ();
           Ptr<Packet> copy = txParams->packet->Copy ();
           ne.packet = copy;
@@ -153,7 +181,9 @@ THzChannel::SendPacket (Ptr<THzSpectrumSignalParameters> txParams)
           Simulator::ScheduleWithContext (dstNodeId, delay, &THzChannel::ReceivePacket, this, j, ne);
         }
       j++;
+      dev_index++;
     }
+    NS_LOG_UNCOND("receiver count is " << count);
   return true;
 }
 

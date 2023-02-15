@@ -18,6 +18,10 @@
  * Author: Qing Xia <qingxia@buffalo.edu>
  *         Zahed Hossain <zahedhos@buffalo.edu>
  *         Josep Miquel Jornet <j.jornet@northeastern.edu>
+ *
+ * Modified by: Farhan Siddiqui <farhansi@gmail.com>
+             Bikash Muzamdar <bikashmazumdar2000@gmail.com>
+ 
  */
 
 #ifndef THZ_CHANNEL_H
@@ -150,6 +154,7 @@ private:
   void DeleteNoiseEntry (NoiseEntry ne);
   double m_noiseFloor;
   double m_Rxorientation;
+  double m_Txorientation[100]; //holds the orientation angles of all clients (default transmitters)
   double m_totalGain;
 
   double m_XnodeMode;  //!< Antenna mode of the Xnode of the node pair (X-Y)

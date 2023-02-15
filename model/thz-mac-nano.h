@@ -127,6 +127,8 @@ public:
   virtual void SetForwardUpCb (Callback<void, Ptr<Packet>, Mac48Address, Mac48Address> cb);
   virtual void Clear (void);
 
+  virtual void CheckPacketPower (Ptr<THzPhy> phy, Ptr<Packet> packet, double_t rxPower, double_t rxPower_th); //added
+
 private:
   /**
    * Return transmission duration for a control packet.

@@ -145,7 +145,7 @@ THzMacMacroAp::GetTypeId (void)
                    "Minimum packet size",
                    UintegerValue (15000),
                    MakeUintegerAccessor (&THzMacMacroAp::m_packetSize),
-                   MakeUintegerChecker<uint32_t> ())   
+                   MakeUintegerChecker<uint32_t> ())
     .AddAttribute ("PropDelay",
                    "default time of propagation for r=10m",
                    TimeValue (NanoSeconds(33.3)),
@@ -165,27 +165,27 @@ THzMacMacroAp::GetTypeId (void)
                    "Carrier sense threshold for this MCS",
                    DoubleValue (-48),
                    MakeDoubleAccessor (&THzMacMacroAp::csth_BPSK),
-                   MakeDoubleChecker<double> ()) 
+                   MakeDoubleChecker<double> ())
     .AddAttribute ("CS_QPSK",
                    "Carrier sense threshold for this MCS",
                    DoubleValue (-45),
                    MakeDoubleAccessor (&THzMacMacroAp::csth_QPSK),
-                   MakeDoubleChecker<double> ()) 
+                   MakeDoubleChecker<double> ())
     .AddAttribute ("CS_8PSK",
                    "Carrier sense threshold for this MCS",
                    DoubleValue (-42),
                    MakeDoubleAccessor (&THzMacMacroAp::csth_8PSK),
-                   MakeDoubleChecker<double> ()) 
+                   MakeDoubleChecker<double> ())
     .AddAttribute ("CS_16QAM",
                    "Carrier sense threshold for this MCS",
                    DoubleValue (-38),
                    MakeDoubleAccessor (&THzMacMacroAp::csth_16QAM),
-                   MakeDoubleChecker<double> ()) 
+                   MakeDoubleChecker<double> ())
     .AddAttribute ("CS_64QAM",
                    "Carrier sense threshold for this MCS",
                    DoubleValue (-32),
                    MakeDoubleAccessor (&THzMacMacroAp::csth_64QAM),
-                   MakeDoubleChecker<double> ()) 
+                   MakeDoubleChecker<double> ())
     .AddTraceSource ("CtsTimeout",
                      "Trace Hookup for CTS Timeout",
                      MakeTraceSourceAccessor (&THzMacMacroAp::m_traceCtsTimeout),
@@ -222,18 +222,23 @@ THzMacMacroAp::Init(void) {
   m_beamwidth = m_thzAD -> GetBeamwidth ();
   m_thzAD -> SetBeamwidth (m_beamwidth);  // to set m_exponent
   m_thzAD -> SetAttribute ("TuneRxTxMode", DoubleValue (1));     // set as receiver
-  m_thzAD -> SetAttribute ("InitialAngle", DoubleValue (0)); 
-  
-  m_tData = GetDataDuration (m_packetSize, 0);  
+  m_thzAD -> SetAttribute ("InitialAngle", DoubleValue (0));
+
+
+  m_tData = GetDataDuration (m_packetSize, 0);
 
   m_tSector = GetCtrlDuration (THZ_PKT_TYPE_CTS) + m_tProp + GetSifs() + GetMaxBackoff() + m_tData
               + m_tProp + GetSifs() + GetCtrlDuration (THZ_PKT_TYPE_ACK) + NanoSeconds(10);   
+
   m_nSector = 360 / m_beamwidth;
   m_tMaxCircle = m_nSector * m_tSector;
-  m_turningSpeed = ((double) 1 / (double) m_tMaxCircle.GetNanoSeconds()) * 1e9;    
+  m_turningSpeed = ((double) 1 / (double) m_tMaxCircle.GetNanoSeconds()) * 1e9;
   m_thzAD -> SetRxTurningSpeed(m_turningSpeed);
-  NS_LOG_DEBUG ("tSector: " << m_tSector << " tCircle: " << m_tMaxCircle << " turning speed " << m_turningSpeed);
+  NS_LOG_UNCOND ("AP: tSector: " << m_tSector << " tCircle: " << m_tMaxCircle << " turning speed " << m_turningSpeed);
   m_nodeId = m_device -> GetNode () -> GetId ();
+    m_clientMobility = m_device-> GetNode ()->GetObject<MobilityModel> ();
+  Vector pos = m_clientMobility->GetPosition ();
+    NS_LOG_UNCOND (Simulator::Now() << " - Node " << m_nodeId << " init. X: " << pos.x << " Y: " << pos.y);
 
   m_recordNodeSector = false;
   if (m_useWhiteList)
@@ -260,9 +265,9 @@ THzMacMacroAp::TurnRxAntenna (void) {
     }
 
   m_thzAD->TuneRxOrientation (m_angle);  // turn to next sector
-  
-  if (m_ways == 3) 
-    { 
+
+  if (m_ways == 3)
+    {
       SendCta3();   // 3-way
     }
   else
@@ -296,7 +301,7 @@ THzMacMacroAp::SendCta3 ()
 
   if (m_recordNodeSector)
     {
-      ctaHeader.SetFlags (1);  // Flags = 1: Request answer from all nodes 
+      ctaHeader.SetFlags (1);  // Flags = 1: Request answer from all nodes
       NS_LOG_DEBUG (Simulator::Now() << " - AP - CTA Flags = " << ctaHeader.GetFlags());
     }
   else
@@ -308,7 +313,7 @@ THzMacMacroAp::SendCta3 ()
   m_waitTimeEvent = Simulator::Schedule (waitTime ,&THzMacMacroAp::WaitTimeExpired, this);
   packet->AddHeader (ctaHeader);
   SendPacket (packet, 0);
-  NS_LOG_UNCOND (Simulator::Now() << " - AP - CTA sent. RTS Timeout started, expires in " << waitTime);
+  NS_LOG_UNCOND (Simulator::Now() << " - AP - CTA3 sent. RTS Timeout started, expires in " << waitTime);
 }
 
 void
@@ -327,7 +332,7 @@ THzMacMacroAp::SendCts (Mac48Address dest, uint16_t sequence, Time duration, uin
 
 
 void
-THzMacMacroAp::DataTimeout () 
+THzMacMacroAp::DataTimeout ()
 {
   m_sectorTimeoutEvent.Cancel();
   NS_LOG_UNCOND (Simulator::Now() << " - AP - DATA TIMEOUT. Turning to next sector");
@@ -349,7 +354,7 @@ THzMacMacroAp::WaitTimeExpired ()  // Wait Time will always expire. Check how ma
   if (m_recordNodeSector)
     {
       NS_LOG_UNCOND (Simulator::Now() << " - AP - Wait Time Expired. Received " << m_rtsList.size() << ". Sector: " << m_angle);
-      if (m_sectorMap.find (m_angle) == m_sectorMap.end()) 
+      if (m_sectorMap.find (m_angle) == m_sectorMap.end())
         {
           m_sectorMap.insert (std::make_pair (m_angle, std::vector<std::pair<Mac48Address, double>>())); // Create map entry for the sector
         }
@@ -363,7 +368,7 @@ THzMacMacroAp::WaitTimeExpired ()  // Wait Time will always expire. Check how ma
           rts->PeekHeader(header);
           bool already_exists = false;
           std::vector<std::pair<Mac48Address, double>>::iterator it2 = m_sectorMap[m_angle].begin();
-          for (; it2 != m_sectorMap[m_angle].end(); it2++)  
+          for (; it2 != m_sectorMap[m_angle].end(); it2++)
             {
               if (it2->first == header.GetSource())
                 {
@@ -378,13 +383,13 @@ THzMacMacroAp::WaitTimeExpired ()  // Wait Time will always expire. Check how ma
         }
 
       std::vector<std::pair<Mac48Address, double>>::iterator it3 = m_sectorMap[m_angle].begin();
-      for (; it3 != m_sectorMap[m_angle].end(); it3++) 
+      for (; it3 != m_sectorMap[m_angle].end(); it3++)
         {
           NS_LOG_UNCOND (it3->first << " with power " << it3->second);
         }
       m_rtsList.clear();
 
-      if (m_dummyCycles >= 3)
+      if (m_dummyCycles >= 3) //default is 3
         {
           m_recordNodeSector = false;
           InitNodeMap();
@@ -416,22 +421,22 @@ THzMacMacroAp::WaitTimeExpired ()  // Wait Time will always expire. Check how ma
         {
           flag = SelectMCS (it->second);  // it->second contains the RTS received power. Select MCS depending on power.
         }
-      
+
       Time sendAfter = (GetCtrlDuration (THZ_PKT_TYPE_CTS) + PicoSeconds(1)) * i;  // wait time to send CTS
       i++;
       Simulator::Schedule (sendAfter, &THzMacMacroAp::SendCts, this, header.GetSource(), header.GetSequence(), wait, flag);
       wait = wait + GetDataDuration (m_packetSize, flag) + GetMaxBackoff(); // wait time to send DATA for the next node
     }
-  m_expectedData = i; 
+  m_expectedData = i;
   Time sectorTime = 2 * m_tProp + GetSifs() + (GetCtrlDuration (THZ_PKT_TYPE_CTS) + m_tData + GetMaxBackoff() + GetCtrlDuration (THZ_PKT_TYPE_ACK)) * m_expectedData + GetSifs();
   m_sectorTimeoutEvent = Simulator::Schedule (sectorTime, &THzMacMacroAp::SectorTimeout, this);  // start a sector T/O as a maximum sector time just in case DATA is not received. If DATA is received successfully, it will be cancelled
-  
+
   NS_LOG_DEBUG (Simulator::Now() << " - AP - Sector timeout event scheduled in " << sectorTime);
   m_rtsList.clear();
 }
 
 void
-THzMacMacroAp::SectorTimeout () 
+THzMacMacroAp::SectorTimeout ()
 {
   if (!m_ackList.empty())
     {
@@ -466,17 +471,18 @@ THzMacMacroAp::GetMaxBackoff()
 void
 THzMacMacroAp::ReceiveData (Ptr<Packet> packet)
 {
+  NS_LOG_UNCOND("THzMacMacroAp::ReceiveData at node " << m_nodeId); 
   NS_LOG_FUNCTION ("at node " << m_nodeId);
   THzMacHeader header;
   packet->RemoveHeader (header);
 
   if (header.GetDestination () == GetBroadcast ())
-    { 
-      NS_LOG_UNCOND ("ERROR: no broadcast DATA packets should be sent"); 
+    {
+      NS_LOG_UNCOND ("ERROR: no broadcast DATA packets should be sent");
     }
   if (header.GetDestination () !=  m_address) // destined not to me
-    { 
-      NS_LOG_UNCOND ("ERROR: all data should be destined to the one AP"); 
+    {
+      NS_LOG_UNCOND ("ERROR: all data should be destined to the one AP");
     }
 
   NS_LOG_UNCOND (Simulator::Now() << " - AP - DATA received. Seq: " << header.GetSequence());
@@ -488,9 +494,9 @@ THzMacMacroAp::ReceiveData (Ptr<Packet> packet)
   ack->AddHeader (ackHeader);
   m_ackList.push_back(ack);
   m_state = IDLE;
-  
+
   // If no more DATA is expected, send ACKs
-  if (m_expectedData == m_ackList.size() || m_ways != 3)  
+  if (m_expectedData == m_ackList.size() || m_ways != 3)
     {
       m_sectorTimeoutEvent.Cancel();
       m_state = WAIT_TX;
@@ -506,7 +512,9 @@ THzMacMacroAp::ReceiveData (Ptr<Packet> packet)
 void
 THzMacMacroAp::ReceiveRts (Ptr<Packet> packet, double rxPower)
 {
-  NS_LOG_DEBUG ("AP - RTS Received. Now: " << Simulator::Now());
+  THzMacHeader head;
+  packet->PeekHeader (head);
+  NS_LOG_UNCOND ("AP - RTS Received. Now: " << Simulator::Now() << " at node " << m_nodeId << " from node " << head.GetSource() << " at AP angle " << m_angle);
   m_rtsList.push_back(std::make_pair(packet, rxPower));
 }
 
@@ -518,7 +526,7 @@ THzMacMacroAp::SendAck ()
   Ptr<Packet> ack = *it;
   THzMacHeader header;
   ack -> PeekHeader(header);
-  SendPacket(ack, 0); // send ACK      
+  SendPacket(ack, 0); // send ACK
   m_ackList.remove(ack);
   NS_LOG_UNCOND (Simulator::Now() << " - AP - ACK sent to " << header.GetDestination() << ". Remaining " << m_ackList.size() << " ACKs");
 }
@@ -561,7 +569,7 @@ THzMacMacroAp::SendPacketDone (Ptr<Packet> packet)
   switch (header.GetType ())
     {
     case THZ_PKT_TYPE_CTA:
-      NS_LOG_DEBUG (Simulator::Now() << " - AP - CTA sent");
+      NS_LOG_UNCOND (Simulator::Now() << " - AP - CTA sent");
       break;
 
     case THZ_PKT_TYPE_RTS:
@@ -573,7 +581,7 @@ THzMacMacroAp::SendPacketDone (Ptr<Packet> packet)
 
     case THZ_PKT_TYPE_DATA:
       if (header.GetDestination () == GetBroadcast ())
-        { 
+        {
           NS_LOG_UNCOND ("ERROR: there should be no broadcast packets");
         }
       break;
@@ -628,9 +636,9 @@ THzMacMacroAp::ReceivePacketDone (Ptr<THzPhy> phy, Ptr<Packet> packet, bool succ
   packet->PeekHeader (header);
   NS_LOG_DEBUG (" AP - rxPower: " << rxPower);
 
-  if (!success) // success: SINR > threshold 
+  if (!success) // success: SINR > threshold
     {
-      NS_LOG_DEBUG ("The packet is not encoded correctly. Drop it!");
+      NS_LOG_UNCOND ("The packet is not encoded correctly. Drop it at AP!");
       return;
     }
   switch (header.GetType ())
@@ -638,12 +646,13 @@ THzMacMacroAp::ReceivePacketDone (Ptr<THzPhy> phy, Ptr<Packet> packet, bool succ
     case THZ_PKT_TYPE_RTS:
       ReceiveRts (packet, rxPower);
       break;
-    case THZ_PKT_TYPE_CTA:    
+    case THZ_PKT_TYPE_CTA:
     case THZ_PKT_TYPE_CTS:
     case THZ_PKT_TYPE_ACK:
       NS_LOG_UNCOND ("ERROR: Received packed different than RTS or DATA");
       break;
     case THZ_PKT_TYPE_DATA:
+      NS_LOG_UNCOND("calling THzMacMacroAp::ReceiveData now...");
       ReceiveData (packet);
       break;
     default:
@@ -672,7 +681,7 @@ THzMacMacroAp::InitNodeMap ()
             {
               m_nodeMap.insert(std::make_pair(it2->first, std::vector<std::pair<double, double>>()));
             }
-          
+
           // push sector (value) into node (key)
           m_nodeMap[it2->first].push_back(std::make_pair(it -> first, it2->second));
         }
@@ -699,7 +708,7 @@ THzMacMacroAp::InitNodeMap ()
             }
           NS_LOG_UNCOND (it5->first << ", " << it5->second);
         }
-      
+
       // Create map entry if non existant
       if (m_whiteList.find(bestSector) == m_whiteList.end())
         {
@@ -720,7 +729,7 @@ void
 THzMacMacroAp::SendFeedbackCTA (double angle, Mac48Address dest)
 {
   NS_LOG_UNCOND (Simulator::Now() << " - AP - Sending Feedback CTA to node " << dest << ". Notify that his sector is " << angle);
-  m_thzAD->TuneRxOrientation (angle); 
+  m_thzAD->TuneRxOrientation (angle);
 
   Ptr<Packet> packet = Create<Packet> (0);
   THzMacHeader ctaHeader = THzMacHeader (m_address, dest, THZ_PKT_TYPE_CTA);
@@ -740,6 +749,7 @@ THzMacMacroAp::AttachPhy (Ptr<THzPhy> phy)
 void
 THzMacMacroAp::SetDevice (Ptr<THzNetDevice> dev)
 {
+  NS_LOG_UNCOND("THzMacMacroAp::SetDevice");
   m_device = dev;
 }
 
@@ -824,6 +834,8 @@ THzMacMacroAp::StateToString (State state)
       return "RX";
     case COLL:
       return "COLL";
+      case AP_DISCOVERY:
+        return "AP_DISCOVERY";
     default:
       return "??";
     }
@@ -883,6 +895,8 @@ THzMacMacroAp::CycleRecord ()
    return;
   */
 }
+
+
 
 
 } /* namespace ns3 */

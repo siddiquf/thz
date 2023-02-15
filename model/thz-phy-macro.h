@@ -203,6 +203,7 @@ private:
   std::string StateToString (State state);
   Ptr<THzNetDevice> m_device;
   Ptr<THzMac> m_mac;
+
   Ptr<THzChannel> m_channel;
   Ptr<SpectrumValue> m_txPsd;
 
@@ -230,6 +231,9 @@ private:
   double m_dataRate8SPK;
   double m_dataRate16QAM;
   double m_dataRate64QAM;
+
+  std::string outputFile; //added
+  bool m_useRefinement; //added
 
 
   std::list<OngoingRx> m_ongoingRx;

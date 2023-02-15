@@ -19,6 +19,9 @@
  *         Zahed Hossain <zahedhos@buffalo.edu>
  *         Josep Miquel Jornet <jmjornet@buffalo.edu>
  *         Daniel Morales <danimoralesbrotons@gmail.com>
+ *
+ * Modified by: Farhan Siddiqui <farhansi@gmail.com>
+             Bikash Muzamdar <bikashmazumdar2000@gmail.com>
  */
 
 #ifndef THZ_MAC_MACRO_CLIENT_H
@@ -98,6 +101,11 @@ public:
    * \return the type ID.
    */
   static TypeId GetTypeId (void);
+
+  /** Methods for rotating TX antenna **/
+  void TurnTxAntenna ();
+  void SectorTimeout ();
+
 
   /**
    * \param duration the slot duration
@@ -190,10 +198,11 @@ public:
     */
   virtual void ReceivePacketDone (Ptr<THzPhy> phy, Ptr<Packet> packet, bool collision, double rxPower);
 
+
 private:
   typedef enum
   {
-    IDLE, BACKOFF, WAIT_TX, TX, WAIT_ACK, RX, COLL
+    IDLE, BACKOFF, WAIT_TX, TX, WAIT_ACK, RX, COLL, AP_DISCOVERY
   } State;
 
   Time GetSifs (void) const;
@@ -390,6 +399,27 @@ private:
     */
   void PositionsRecord ();
 
+  /**
+    * \brief records the time when client discovers the AP into output file
+    */
+  void DiscoveryTimeRecord ();
+
+  /**
+    * \brief called when link loss detection timer expires indicating link has been lost
+    */
+  void LinkTimeout () ;
+
+   /**
+    * \brief changes location of client nodes
+    */
+  void LocationChange () ;
+
+
+   /**
+    * \brief records the time taken to rediscover the AP into an output file
+    */
+  void ReDiscoveryTimeRecord (Time reDiscoveryTime); 
+
   Callback <void, Ptr<Packet>, Mac48Address, Mac48Address> m_forwardUpCb;
   Mac48Address m_address;
   Ptr<THzPhy> m_phy;
@@ -408,6 +438,7 @@ private:
   EventId m_sendAckEvent;
   EventId m_sendDataEvent;
   EventId m_SetRxAntennaEvent;
+  EventId m_LinkTimeoutEvent;  //link timeout
 
   // Mac parameters
   uint16_t m_boSlots;
@@ -456,6 +487,9 @@ private:
   std::list<Rec> m_rec;
   std::list<Result> m_result;
 
+  double dir;
+
+
   std::list<AckTimeouts> m_ackTimeouts;
   std::list<CtsTimeouts> m_ctsTimeouts;
 
@@ -484,7 +518,14 @@ private:
   void InitVariables();
   double m_nSector;
   Time m_tCircle;
+  Time m_tMaxCircle;
   Time m_tSector;
+  Time m_tLink;              // link loss detection timeout value
+  Time time_cta_rcvd_2;      // records timestamp when a cta packet is received
+  Time cta_timestamp[5];     // cta arrival timestamps
+  int ctaCount;              //records the number of cta packets received
+  Time cta_time[4];          //stires the time interval between arriving ctas
+  int rounds;                // number of rounds rotated by client for each discovery
   uint16_t m_nodeId;
   std::string outputFile;
   uint16_t m_ctsReceived;
@@ -492,12 +533,24 @@ private:
   uint16_t m_lastSeq;
   void DecreaseBackoff ();
   double m_dataRate;
+  double m_radius;
   Time m_tProp;
   Time m_timeCTSrx;
   double m_sector;
   bool m_rtsAnswered;
   void StateRecord(uint16_t state);
+
+  EventId m_sectorTimeoutEvent;
+  double m_angle;          // angle (orientation) of the transmitter antenna
+  Vector current_position; // current position of client node in terms of x,y coordinates
+  Vector new_position;     // new position of client node in terms of x,y coordinates after location change 
+  Time link_loss_time;     // time at which client - AP link alignment is lost due to location change
+  Time time_rediscovery;   // time at which client rediscovers the link via receipt of cta message
+  int  m_discovery_count;  // tracks how many times the client discovered the link (includes both actual link lost as well as immature timeouts)
   
+  double m_turningSpeed;
+  uint16_t m_dummyCycles;
+
 protected:
 };
 

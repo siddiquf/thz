@@ -166,6 +166,7 @@ THzNetDevice::SetPhy (Ptr<THzPhy> phy)
 void
 THzNetDevice::SetChannel (Ptr<THzChannel> channel)
 {
+    NS_LOG_UNCOND("THzNetDevice::SetChannel");
   if (channel != 0)
     {
       m_channel = channel;

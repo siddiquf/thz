@@ -1,3 +1,5 @@
+// 28—Works great for basic exhaustive scheme for config # 28
+
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
  * Copyright (c) 2021 Northeastern University (https://unlab.tech/)
@@ -19,6 +21,9 @@
  *         Zahed Hossain <zahedhos@buffalo.edu>
  *         Josep Miquel Jornet <jmjornet@buffalo.edu>
  *         Daniel Morales <danimoralesbrotons@gmail.com>
+ *
+ *  Modified by: Farhan Siddiqui <farhansi@gmail.com>
+             Bikash Muzamdar <bikashmazumdar2000@gmail.com>
  */
 
 #include "ns3/attribute.h"
@@ -47,6 +52,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <sstream>
+#include <math.h> //added
 
 NS_LOG_COMPONENT_DEFINE ("THzMacMacroClient");
 
@@ -57,10 +63,11 @@ NS_OBJECT_ENSURE_REGISTERED (THzMacMacroClient);
 THzMacMacroClient::THzMacMacroClient ()
   : THzMac (),
   m_phy (0),
-  m_state (IDLE),
+  m_state (AP_DISCOVERY),
   m_ctsTimeoutEvent (),
   m_ackTimeoutEvent (),
   m_sendDataEvent (),
+  m_LinkTimeoutEvent(),
   m_pktData (0)
 
 {
@@ -70,13 +77,22 @@ THzMacMacroClient::THzMacMacroClient ()
   m_localNav = Simulator::Now ();
   m_ite = 0;
   m_throughputAll = 0;
-  m_state = IDLE;
+  m_state = AP_DISCOVERY; //initial state to enable AP discovery
   m_discard = 0;
   m_send = 0;
   m_rxIniAngle = 0;
   m_sector = -1;
   m_result.clear ();
   m_rtsAnswered = true;
+  m_angle = 0;
+  rounds=0; 
+  dir = 1; 
+  m_tLink = Seconds(0.001);
+  ctaCount=0;
+  time_cta_rcvd_2 = Seconds(0);
+  link_loss_time = Seconds(0);
+  time_rediscovery = Seconds(0);
+  m_discovery_count = 0;
   Simulator::ScheduleNow(&THzMacMacroClient::InitVariables, this);
 }
 
@@ -163,6 +179,11 @@ THzMacMacroClient::GetTypeId (void)
                    DoubleValue (148.01e9),
                    MakeDoubleAccessor (&THzMacMacroClient::m_dataRate),
                    MakeDoubleChecker<double> ())
+    .AddAttribute ("Radius",
+                   "max supported radius",
+                   DoubleValue (7.0),
+                   MakeDoubleAccessor (&THzMacMacroClient::m_radius),
+                   MakeDoubleChecker<double> ())
     .AddAttribute ("PropDelay",
                    "name of the output file",
                    TimeValue (PicoSeconds(3333)),
@@ -194,25 +215,184 @@ THzMacMacroClient::GetTypeId (void)
 
 void
 THzMacMacroClient::InitVariables (void) {
+
   m_tData = Seconds ((m_MinEnquePacketSize + 53) * 8 / m_dataRate);  // 53 bytes of overhead (48 B MAC + 5 B PHY)
 
   m_backoffActive = false;
   m_thzAD = m_device -> GetDirAntenna ();
   m_beamwidth = m_thzAD -> GetBeamwidth ();
-  m_thzAD -> SetBeamwidth (m_beamwidth);  // to set m_exponent 
+
+  Ptr<UniformRandomVariable> unifRandom = CreateObject<UniformRandomVariable> ();
+  unifRandom->SetAttribute ("Min", DoubleValue (0));
+  unifRandom->SetAttribute ("Max", DoubleValue (360));
+  int i_angle;
+  int i_beamwidth;
+ 
+  do {
+    m_angle = unifRandom->GetInteger (0,360);
+    i_angle = (int) m_angle;
+    i_beamwidth = (int) m_beamwidth;
+  } while ((i_angle % i_beamwidth) != 0);
+
+  
+  NS_LOG_UNCOND (" - Node " << m_device -> GetNode () -> GetId() << " initial angle " << m_angle << " client beamwidth " << m_beamwidth);
+  m_thzAD->TuneTxOrientation (m_angle);
+  
+  m_thzAD -> SetBeamwidth (m_beamwidth);  // to set m_exponent
+
   m_nodeId = m_device -> GetNode () -> GetId ();
   m_thzAD->SetAttribute ("TuneRxTxMode", DoubleValue (0)); // set as transmitter
-  m_thzAD->SetAttribute ("InitialAngle", DoubleValue (0.0));
+  m_thzAD->SetAttribute ("TxInitialAngle", DoubleValue (m_angle)); //must be same as  m_thzAD->TuneTxOrientation (m_angle);?
   m_clientMobility = m_device-> GetNode ()->GetObject<MobilityModel> ();
-  Vector pos = m_clientMobility->GetPosition ();
-  NS_LOG_UNCOND (Simulator::Now() << " - Node " << m_nodeId << " init. X: " << pos.x << " Y: " << pos.y);
+
+   Vector current_position = m_clientMobility->GetPosition ();
+   NS_LOG_UNCOND (Simulator::Now() << " - Node " << m_nodeId << " init. X: " << current_position.x << " Y: " << current_position.y);
+
+
+  /** Set antenna rotation parameters **/
+
+     m_tSector = GetCtrlDuration (THZ_PKT_TYPE_CTA) + m_tProp + GetSifs() + GetMaxBackoff() +                                                                                                                         GetCtrlDuration (THZ_PKT_TYPE_RTS) + m_tProp + GetSifs() + GetMaxBackoff() +                                                                                                                         GetCtrlDuration (THZ_PKT_TYPE_CTS) + m_tProp + GetSifs() + GetMaxBackoff() +                                                                                                                                                    m_tData + m_tProp + GetSifs() +  GetMaxBackoff() +                                                                                                                       GetCtrlDuration (THZ_PKT_TYPE_ACK) + m_tProp + GetSifs() + GetMaxBackoff() ;
+
+
+  m_nSector = 360 / m_beamwidth;
+  m_tMaxCircle = m_nSector * m_tSector;
+  /* Setting the antenna turning speed double of AP **/
+  m_turningSpeed = (((double) 1 / (double) m_tMaxCircle.GetNanoSeconds()) * 1e9);
+  m_thzAD -> SetTxTurningSpeed(m_turningSpeed);
+  m_state = AP_DISCOVERY;
+  NS_LOG_UNCOND ("Client : tSector: " << m_tSector << " tCircle: " << m_tMaxCircle << " turning speed " << m_turningSpeed << " m_nSector " << m_nSector);
+
+  NS_LOG_UNCOND ("at node " << m_nodeId  << " now " << Simulator::Now () << " state: " << StateToString (m_state));
 
   PositionsRecord();
+   NS_LOG_UNCOND ("Initial computed m_angle " << m_angle << " sector time: " << m_tSector << " m_beamwidth " << m_beamwidth);
+
+  // Turn TX antenna
+   Simulator::ScheduleNow(&THzMacMacroClient::TurnTxAntenna, this);
+ 
 }
+  
+void
+THzMacMacroClient::TurnTxAntenna (void) {
+
+  NS_LOG_UNCOND("THzMacMacroClient::TurnTxAntenna " << Simulator::Now());
+    
+  if (m_state != AP_DISCOVERY ) {
+    NS_LOG_UNCOND("Node " << m_nodeId  << " no longer in discovery mode - current state is  " << StateToString(m_state));
+    return;
+  }
+
+  NS_LOG_UNCOND("Node " << m_nodeId << " m_tSector is " << m_tSector << " rounds = " << rounds);
+  
+  if (m_state == AP_DISCOVERY) {
+
+    NS_LOG_UNCOND ("****Turn Tx Antenna at node " << m_nodeId << " now " << Simulator::Now () << " state: " << StateToString (m_state) << "****");
+    NS_LOG_UNCOND ("Turn Tx Antenna angle " << m_angle << " sector:" << m_tSector << " m_beamwidth " << m_beamwidth);
+   
+    
+    if ( rounds <= 10 && dir == 1) {
+      m_angle = m_angle + m_beamwidth;
+    }
+    else if (rounds <= 10 && dir == -1) {
+      m_angle = m_angle - m_beamwidth;
+    }
+    
+   
+    if(rounds > 10 && dir == 1) {
+      m_angle = m_angle  + (m_beamwidth/2);
+    }
+    else if (rounds > 10 && dir == -1) {
+      m_angle = m_angle - (m_beamwidth/2);
+    }
+    
+    
+    if (m_angle  >= 360) {
+        rounds++;
+         dir = -1;
+     } else if (m_angle <= 0) {
+        rounds++;
+        dir = 1;
+     }
+      
+  
+    while (m_angle <= -360)
+    {
+      NS_LOG_UNCOND("in < -360");
+      m_angle += 360;
+      
+    }
+
+    while (m_angle > 360)
+    {
+      NS_LOG_UNCOND("in > 360");
+      m_angle -= 360;
+    }
+
+    if (m_sectorTimeoutEvent.IsRunning()) {
+      m_sectorTimeoutEvent.Cancel();
+    }
+    NS_LOG_UNCOND (Simulator::Now() << " - TX - ---------- turning to sector at " << m_angle  << " ---------- at node " << m_nodeId );
+    m_thzAD->TuneTxOrientation (m_angle);  // turn to next sector
+    NS_LOG_UNCOND ("Node " << m_nodeId  << " m_angle is " << m_angle);
+   
+    m_sectorTimeoutEvent = Simulator::Schedule (m_tSector ,&THzMacMacroClient::SectorTimeout, this);
+  }
+}
+
+
+
+void
+THzMacMacroClient::SectorTimeout ()
+{
+  NS_LOG_UNCOND (" THzMacMacroClient::SectorTimeout (): at node " << m_nodeId  << " now " << Simulator::Now () << " state: " << StateToString (m_state));
+  if (m_state == AP_DISCOVERY )
+  {
+      NS_LOG_UNCOND(Simulator::Now() << " - CLIENT - ---------- SECTOR TIMEOUT. No CTA received from AP. Turning to next sector ");
+      TurnTxAntenna();     
+  }
+  else {
+    
+      NS_LOG_UNCOND("Sim time now: " << Simulator::Now() << " Node " << m_nodeId << " no longer in discovery mode - now facing AP at angle  " << m_angle );
+  }
+  
+}
+
+void
+  THzMacMacroClient::LocationChange (void) {
+
+     m_discovery_count++;
+
+     NS_LOG_UNCOND("locationchange Radius = " << m_radius);
+
+     Vector current_position = m_clientMobility->GetPosition ();
+     Vector position = m_clientMobility->GetPosition ();
+     position.x = -position.x;
+     position.y = -position.y;
+     m_clientMobility->SetPosition (position);
+     m_angle=0; rounds=0;
+     Vector new_position = m_clientMobility->GetPosition ();
+     if (new_position != current_position) {
+       std::cout << "Location of node " << m_nodeId << " has changed to " << position.x << " " << position.y << "@ time" << Simulator::Now() << std::endl;
+       NS_LOG_UNCOND (Simulator::Now() << " - current position of node " << m_nodeId << " init. X: " << current_position.x << " Y: " << current_position.y);
+       NS_LOG_UNCOND (Simulator::Now() << " - new position of node " << m_nodeId << " init. X: " << new_position.x << " Y: " << new_position.y);
+     }
+}
+
+void
+THzMacMacroClient::LinkTimeout () {
+  NS_LOG_UNCOND (" THzMacMacroClient::LinkTimeout at node " << m_nodeId << "at time " << Simulator::Now() << " m_tlink is " << m_tLink);
+  link_loss_time =  Simulator::Now();
+  m_state=AP_DISCOVERY;
+  dir=1;
+  Simulator::ScheduleNow(&THzMacMacroClient::TurnTxAntenna, this);
+  }
+
 
 bool
 THzMacMacroClient::Enqueue (Ptr<Packet> packet, Mac48Address dest)
 {
+  
+  NS_LOG_DEBUG("THzMacMacroClient::Enqueue");
   if (packet->GetSize () < m_MinEnquePacketSize)
     {
       m_pktQueue.push_front (packet);
@@ -232,13 +412,14 @@ THzMacMacroClient::Enqueue (Ptr<Packet> packet, Mac48Address dest)
       rec.RecSeq = m_sequence;
       rec.RecRetry = 0;
       rec.Recpacket = packet;
-      rec.BackoffLife = 0; 
+      rec.BackoffLife = 0;
       m_rec.push_back (rec);
       NS_LOG_UNCOND (Simulator::Now() << " - " << m_nodeId << " - ***!!!*** Packet enqueued with size " << packet->GetSize() << ". Queue: " << m_pktQueue.size());
       StateRecord(m_pktQueue.size()-1);
     }
   return false;
 }
+
 
 void
 THzMacMacroClient::Dequeue ()
@@ -253,6 +434,7 @@ THzMacMacroClient::ReceivePacket (Ptr<THzPhy> phy, Ptr<Packet> packet)
   THzMacHeader header;
   packet->PeekHeader (header);
   NS_LOG_DEBUG ("at node " << m_nodeId << " from " << header.GetSource () << " now " << Simulator::Now () << " state: " << StateToString (m_state));
+  NS_LOG_DEBUG (Simulator::Now() << " - TX - ---------- received message at sector  " << m_angle + m_beamwidth << " ----------");
   ChannelBecomesBusy ();
   switch (m_state)
     {
@@ -266,30 +448,39 @@ THzMacMacroClient::ReceivePacket (Ptr<THzPhy> phy, Ptr<Packet> packet)
     case TX:
     case COLL:
       break;
+    case AP_DISCOVERY: 
+      // m_state = RX;  
+      break;
     }
+    //NS_LOG_DEBUG (" now " << Simulator::Now () << " state: " << StateToString (m_state));
+
 }
 
 void
 THzMacMacroClient::ReceivePacketDone (Ptr<THzPhy> phy, Ptr<Packet> packet, bool success, double rxPower)
 {
+
+  NS_LOG_UNCOND("THzMacMacroClient::ReceivePacketDone  - m_angle is " << m_angle << " rxpower is " << rxPower);
   THzMacHeader header;
   packet->PeekHeader (header);
+  NS_LOG_DEBUG (Simulator::Now() << " - TX - ---------- received message at sector  " << m_angle + m_beamwidth << " ----------");
 
-  // important: change m_state in the specific ReceiveXXX function. 
-  if(m_state == RX || (m_state == WAIT_ACK && header.GetType() == THZ_PKT_TYPE_ACK))    // This solves the problem of receiving CTA from next sector before receiving ACK (if DATA tx failed)
+  // important: change m_state in the specific ReceiveXXX function.
+  if(m_state == AP_DISCOVERY || m_state == RX || (m_state == WAIT_ACK && header.GetType() == THZ_PKT_TYPE_ACK))    // This solves the problem of receiving CTA from next sector before receiving ACK (if DATA tx failed)
   {
     if (!success)
       {
-        NS_LOG_DEBUG ("The packet is not encoded correctly. Drop it!");
+        NS_LOG_UNCOND ("The packet is not encoded correctly. Drop it now at client!");
         return;
       }
     switch (header.GetType ())
       {
       case THZ_PKT_TYPE_RTS:
       case THZ_PKT_TYPE_DATA:
-        NS_LOG_UNCOND (Simulator::Now() << " - ERROR: Can only receive CTS or ACK");
+        NS_LOG_DEBUG (Simulator::Now() << " - ERROR: Can only receive CTS or ACK");
         break;
       case THZ_PKT_TYPE_CTA:
+       
         NS_LOG_DEBUG (Simulator::Now() << " - " << m_nodeId << " - Receive CTA");
         if (m_ways == 1)
           {
@@ -313,20 +504,116 @@ THzMacMacroClient::ReceivePacketDone (Ptr<THzPhy> phy, Ptr<Packet> packet, bool 
       }
     return;
   }
-  NS_LOG_UNCOND (Simulator::Now() << " - " << m_nodeId << " - !!! WARNING: Packet received in state " << m_state << ", shouldn't have been received");
+  NS_LOG_DEBUG (Simulator::Now() << " - " << m_nodeId << " - !!! WARNING: Packet received in state " << m_state << ", shouldn't have been received");
 }
 
 void
-THzMacMacroClient::ReceiveCta3 (Ptr<Packet> packet)    
+THzMacMacroClient::ReceiveCta3 (Ptr<Packet> packet)
 {
-  m_state = IDLE;
+  
+  Time max;
+  NS_LOG_UNCOND("Node " << m_nodeId << " received cta3 -- ctaCount is " << ctaCount);
 
+  if (m_sectorTimeoutEvent.IsRunning()) {
+     NS_LOG_UNCOND("THzMacMacroClient::ReceiveCta3 sector timer running... canceling it.. " << m_nodeId);
+     m_sectorTimeoutEvent.Cancel();
+  }
+  
+  time_cta_rcvd_2 = Simulator::Now();   //collect timestamp of cta message for computing rediscovery time
+
+  if(ctaCount <= 4) {
+    cta_timestamp[ctaCount]=Simulator::Now();
+    NS_LOG_UNCOND("Node " << m_nodeId << "cta count is " << ctaCount);
+  }
+  else {
+    NS_LOG_UNCOND("Node " << m_nodeId << "cta count > 4 " << ctaCount);
+    for(int i = 1; i <=4 ; i++)
+    {
+        cta_timestamp[i-1] = cta_timestamp[i];
+    }
+    
+    cta_timestamp[4]=Simulator::Now();
+    
+    for(int i = 0; i < 4 ; i++)
+    {
+        cta_time[i] = cta_timestamp[i+1] - cta_timestamp[i];
+	NS_LOG_UNCOND("cta time  " << i << "  is " << cta_time[i]);
+    }
+    max = cta_time[0];
+
+    for (int i = 0; i < 4; i++)
+    {
+        if (cta_time[i] > max)
+        {
+            max = cta_time[i];
+        }
+    }
+    NS_LOG_UNCOND("max cta time recorded recently is " << max);
+  }
+
+  ctaCount++;
+
+  if(m_state == AP_DISCOVERY ) {
+   if (link_loss_time != PicoSeconds(0)) {                      // check if link was rediscovered- in this case link_loss_time will not be 0 but the time at which link was lost
+    NS_LOG_UNCOND("link loss time != 0 for node " << m_nodeId);
+    time_rediscovery =  time_cta_rcvd_2 - link_loss_time;       //time_cta_rcvd_2 indicates the time at which link was rediscovered indicated by receipt of cta
+    Simulator::ScheduleNow (&THzMacMacroClient::ReDiscoveryTimeRecord,this,time_rediscovery);
+    NS_LOG_UNCOND("Node " << m_nodeId << " REDISCOVERED AP at angle " << m_angle << " at time " << Simulator::Now() << " after " << rounds << " rounds");
+    NS_LOG_UNCOND("writing to redis rec for node " << m_nodeId);
+   }
+  }
+  
+  if (ctaCount >= 5 ) {
+     
+     if(new_position == current_position) {
+       NS_LOG_UNCOND("Position not changed for node " << m_nodeId << " max is " << max );
+       if (max > Seconds(0.001)) {
+	   m_tLink = max ;         //update link loss detection timer to include recent timing history of cta receipts
+	   NS_LOG_UNCOND("m_tlink is now max");
+       }
+       else {
+	  NS_LOG_UNCOND("m_tlink is no longer max");
+	  m_tLink = Seconds(0.001) ; 
+       }
+       NS_LOG_UNCOND("m_tLink value is " << m_tLink << " at time " << Simulator::Now() << " at node " << m_nodeId << "................");
+      }
+      else{
+	current_position = new_position; 
+	m_tLink = Seconds(0.001) ;
+      }
+   }
+
+   if(m_LinkTimeoutEvent.IsRunning()) {   //cancel timer for link loss detection if running
+      m_LinkTimeoutEvent.Cancel();
+      NS_LOG_UNCOND("Link timeout event canceled for node " << m_nodeId);
+   }
+   
+  
+  if(m_state == AP_DISCOVERY ) {
+    m_state = IDLE;
+    if (link_loss_time == Seconds(0)) {
+      Simulator::ScheduleNow (&THzMacMacroClient::DiscoveryTimeRecord,this);
+      NS_LOG_UNCOND("Node " << m_nodeId << " DISCOVERED AP at angle " << m_angle << " at time " << Simulator::Now() << " after " << rounds << " full 360 degree rotations");
+      NS_LOG_DEBUG("m_nodeId % 2: " << m_nodeId % 2);
+      NS_LOG_DEBUG("Number of times node  " << m_nodeId << " discovered AP is = " << m_discovery_count);
+       if (m_nodeId % 2 == 0 &&  m_discovery_count == 0) {   // 50% of existing nodes will switch their locations
+	 Simulator::Schedule(Seconds(0.001),&THzMacMacroClient::LocationChange, this);
+      }
+    }
+  }
+
+ link_loss_time=Seconds(0);
+
+
+  m_LinkTimeoutEvent = Simulator::Schedule (m_tLink ,&THzMacMacroClient::LinkTimeout, this); //restart timer for link loss detection
+  NS_LOG_UNCOND("Link timeout event restarted for node " << m_nodeId);
+   
   THzMacHeader ctaHeader;
   packet->RemoveHeader (ctaHeader);
-  NS_LOG_DEBUG (Simulator::Now() << " - " << m_nodeId << " - CTA received " << ctaHeader.GetFlags());
+  NS_LOG_UNCOND (Simulator::Now() << " - " << m_nodeId << " - CTA3 received " << ctaHeader.GetFlags());
 
   // DUMMY CTA: Mandatory answer Dummy RTS
-  if (ctaHeader.GetFlags() == 1)  
+  if (ctaHeader.GetFlags() == 1)
     {
       Ptr<Packet> rts = Create<Packet> (0);
       THzMacHeader header = THzMacHeader (m_address, ctaHeader.GetSource(), THZ_PKT_TYPE_RTS);
@@ -334,7 +621,7 @@ THzMacMacroClient::ReceiveCta3 (Ptr<Packet> packet)
       rts->AddHeader(header);
       Ptr<UniformRandomVariable> uv = CreateObject<UniformRandomVariable> ();
       uint32_t cw = uv->GetInteger (1, m_boSlots);
-      Time t_backoffStart = GetSlotTime() * cw;  
+      Time t_backoffStart = GetSlotTime() * cw;
 
       NS_LOG_UNCOND (Simulator::Now() << " - " << m_nodeId << " - DUMMY RTS will be sent in " << t_backoffStart);
       Simulator::Schedule(t_backoffStart, &THzMacMacroClient::SendPacket, this, rts, 0, 0);
@@ -342,7 +629,7 @@ THzMacMacroClient::ReceiveCta3 (Ptr<Packet> packet)
     }
 
   // Feedback CTA: record which is the assigned sector
-  if(ctaHeader.GetFlags() == 2 && ctaHeader.GetDestination() == m_address)  
+  if(ctaHeader.GetFlags() == 2 && ctaHeader.GetDestination() == m_address)
     {
       m_sector = ctaHeader.GetSector();
       NS_LOG_UNCOND (Simulator::Now() << " - " << m_nodeId << " - Feedback CTA Received. Assigned sector " << m_sector);
@@ -352,7 +639,7 @@ THzMacMacroClient::ReceiveCta3 (Ptr<Packet> packet)
   // If queue empty, Do nothing
   if (m_pktQueue.size () == 0)
     {
-      NS_LOG_UNCOND (Simulator::Now() << " - " << m_nodeId << " - CTS Received. Queue is empty, do nothing"); 
+      NS_LOG_UNCOND (Simulator::Now() << " - " << m_nodeId << " - CTA3 Received. Queue is empty, do nothing"); //corrected to cta from cts
       return;
     }
 
@@ -365,7 +652,7 @@ THzMacMacroClient::ReceiveCta3 (Ptr<Packet> packet)
     }
 
   // If in BO, decrease life
-  if (m_backoffActive)   
+  if (m_backoffActive)
     {
       DecreaseBackoff();
       return;
@@ -374,16 +661,16 @@ THzMacMacroClient::ReceiveCta3 (Ptr<Packet> packet)
     m_ctsReceived = 0;  // for 3-way, need to set cts received to 0. Maybe makes more sense to do this after ACK is received
 
   // Check sector
-  if (m_sector > -1 && ctaHeader.GetSector() != m_sector) 
+  if (m_sector > -1 && ctaHeader.GetSector() != m_sector)
     {
-      NS_LOG_UNCOND (Simulator::Now() << " - " << m_nodeId << " - CTA received. Not my sector (" << m_sector << "). Do nothing");
+      NS_LOG_UNCOND (Simulator::Now() << " - " << m_nodeId << " - CTA3 received. Not my sector (" << m_sector << "). Do nothing");
       return;
     }
 
   // Random Start Backoff
   Ptr<UniformRandomVariable> uv = CreateObject<UniformRandomVariable> ();
   uint32_t cw = uv->GetInteger (1, m_boSlots);
-  Time t_backoffStart = GetSlotTime() * cw;  
+  Time t_backoffStart = GetSlotTime() * cw;
 
   // Send RTS
   std::list<Rec>::iterator it = m_rec.begin();
@@ -391,7 +678,7 @@ THzMacMacroClient::ReceiveCta3 (Ptr<Packet> packet)
   THzMacHeader dataHeader;
   m_pktData->PeekHeader (dataHeader);
   m_state = WAIT_TX;
-  NS_LOG_UNCOND (Simulator::Now() << " - " << m_nodeId << " - CTA received. Sending RTS after " << t_backoffStart << " of BO.");
+  NS_LOG_UNCOND (Simulator::Now() << " - " << m_nodeId << " - CTA3 received. Sending RTS after " << t_backoffStart << " of BO. At node " << m_nodeId);
   Simulator::Schedule(t_backoffStart, &THzMacMacroClient::SendRts, this, m_pktData, it -> RecRetry);
   m_lastSeq = dataHeader.GetSequence();
   m_rtsAnswered = false;
@@ -399,7 +686,7 @@ THzMacMacroClient::ReceiveCta3 (Ptr<Packet> packet)
 
 
 void
-THzMacMacroClient::ReceiveCta1 (Ptr<Packet> packet)   
+THzMacMacroClient::ReceiveCta1 (Ptr<Packet> packet)
 {
   m_state = IDLE;
 
@@ -410,12 +697,12 @@ THzMacMacroClient::ReceiveCta1 (Ptr<Packet> packet)
   // If queue empty, Do nothing
   if (m_pktQueue.size () == 0)
     {
-      NS_LOG_UNCOND (Simulator::Now() << " - " << m_nodeId << " - CTA Received. Queue is empty, do nothing"); 
+      NS_LOG_DEBUG (Simulator::Now() << " - " << m_nodeId << " - CTA Received. Queue is empty, do nothing");
       return;
     }
 
   // If in BO, decrease life
-  if (m_backoffActive)   
+  if (m_backoffActive)
     {
       DecreaseBackoff();
       return;
@@ -430,7 +717,7 @@ THzMacMacroClient::ReceiveCta1 (Ptr<Packet> packet)
   // Random Start Backoff
   Ptr<UniformRandomVariable> uv = CreateObject<UniformRandomVariable> ();
   uint32_t cw = uv->GetInteger (1, m_boSlots);
-  Time t_backoffStart = GetSlotTime() * cw;  
+  Time t_backoffStart = GetSlotTime() * cw;
 
   // Send DATA
   std::list<Rec>::iterator it = m_rec.begin();
@@ -438,7 +725,7 @@ THzMacMacroClient::ReceiveCta1 (Ptr<Packet> packet)
   THzMacHeader dataHeader;
   m_pktData->PeekHeader (dataHeader);
   m_state = WAIT_TX;
-  NS_LOG_UNCOND (Simulator::Now() << " - " << m_nodeId << " - CTA received. Sending DATA after " << t_fairness + t_backoffStart << " of BO + Fairness.");
+  NS_LOG_DEBUG (Simulator::Now() << " - " << m_nodeId << " - CTA received. Sending DATA after " << t_fairness + t_backoffStart << " of BO + Fairness.");
   m_timeCTSrx = Simulator::Now();
   m_sendDataEvent = Simulator::Schedule (t_fairness + t_backoffStart, &THzMacMacroClient::SendData, this, m_pktData, 0);
 }
@@ -451,7 +738,7 @@ THzMacMacroClient::ReceiveCts (Ptr<Packet> packet)
 
   THzMacHeader ctsHeader;
   packet->RemoveHeader (ctsHeader);
-  NS_LOG_DEBUG (Simulator::Now() << " - " << m_nodeId << " - CTS received " << ctsHeader.GetFlags());
+  NS_LOG_UNCOND (Simulator::Now() << " - " << m_nodeId << " - CTS received in response to rts " << ctsHeader.GetFlags() << "at node " << m_nodeId);
 
   m_ctsReceived++;
   if (ctsHeader.GetDestination() == m_address)  // Access granted to send the DATA requested
@@ -470,15 +757,15 @@ THzMacMacroClient::ReceiveCts (Ptr<Packet> packet)
                 {
                   mcs = ctsHeader.GetFlags(); // Set MCS as indicated by AP
                 }
-              Simulator::Schedule(waitToSend, &THzMacMacroClient::SendData, this, it->Recpacket, mcs); 
-              NS_LOG_UNCOND (Simulator::Now() << " - " << m_nodeId << " - CTS RECEIVED destined to me. MCS " << ctsHeader.GetFlags() << ". Sending packet " << ctsHeader.GetSequence() << " after " << waitToSend);
+              Simulator::Schedule(waitToSend, &THzMacMacroClient::SendData, this, it->Recpacket, mcs);
+              NS_LOG_UNCOND (Simulator::Now() << " - " << m_nodeId << " - CTS RECEIVED destined to me. MCS " << ctsHeader.GetFlags() << ". Sending packet " << ctsHeader.GetSequence() << " after " << waitToSend << " using mcs " << mcs);
             }
         }
     }
   else
     {
       NS_LOG_DEBUG (Simulator::Now() << " - " << m_nodeId << " - CTS RECEIVED not destined to me. CTS count: " << m_ctsReceived);
-    } 
+    }
 }
 
 void
@@ -486,20 +773,20 @@ THzMacMacroClient::DecreaseBackoff ()
 {
   std::list<Rec>::iterator it = m_rec.begin();    // use of an iterator is not necessary. But might be useful for future implementations (e.g., multiple DATA packets in a window, some of them not ACK)
   for (; it != m_rec.end(); ++it)
-    {  
-      if (it -> RecSeq == m_backoffSeq) 
-        {     
-          it -> BackoffLife--;        
-          NS_LOG_UNCOND (Simulator::Now() << " - " << m_nodeId << " - Decrease Backoff life to: " << it -> BackoffLife);
+    {
+      if (it -> RecSeq == m_backoffSeq)
+        {
+          it -> BackoffLife--;
+          NS_LOG_DEBUG (Simulator::Now() << " - " << m_nodeId << " - Decrease Backoff life to: " << it -> BackoffLife);
 
-          if (it -> BackoffLife == 0) 
-            {   
+          if (it -> BackoffLife == 0)
+            {
               m_backoffActive = false;
             }
           return;
         }
     }
-  NS_LOG_UNCOND (Simulator::Now() << " - " << m_nodeId << " - ERROR. Packet with BO active not found. This point should never be reached");
+  NS_LOG_DEBUG (Simulator::Now() << " - " << m_nodeId << " - ERROR. Packet with BO active not found. This point should never be reached");
 }
 
 void
@@ -520,23 +807,24 @@ THzMacMacroClient::SendRts (Ptr<Packet> data, uint16_t retry)
 void
 THzMacMacroClient::ChannelBecomesBusy (void)
 {
-  if(m_sendDataEvent.IsRunning()) 
-    { 
-      m_sendDataEvent.Cancel(); 
+  if(m_sendDataEvent.IsRunning())
+    {
+      m_sendDataEvent.Cancel();
     }
 }
 
 void
 THzMacMacroClient::SendData (Ptr<Packet> packet, int mcs)
 {
+  NS_LOG_UNCOND("THzMacMacroClient::SendData");
   m_state = WAIT_TX;
   m_pktData = packet;
-  NS_LOG_DEBUG (Simulator::Now() << " - SEND DATA at node: " << m_nodeId << " now: " << Simulator::Now () << " QueueSize " << m_pktQueue.size ());
+  NS_LOG_UNCOND (Simulator::Now() << " - SEND DATA at node: " << m_nodeId << " now: " << Simulator::Now () << " QueueSize " << m_pktQueue.size ());
   THzMacHeader header;
   m_pktData->PeekHeader (header);
   if (header.GetDestination () == GetBroadcast ())  // Broadcast
     {
-      NS_LOG_UNCOND (Simulator::Now() << " - Broadcast of data not supported");
+      NS_LOG_DEBUG (Simulator::Now() << " - Broadcast of data not supported");
     }
   if (header.GetDestination () != GetBroadcast ())  // Unicast
     {
@@ -562,13 +850,13 @@ THzMacMacroClient::SendData (Ptr<Packet> packet, int mcs)
         {
           m_state = IDLE;
         }
-    }    
+    }
 }
 
 bool
 THzMacMacroClient::SendPacket (Ptr<Packet> packet, bool rate, uint16_t mcs)
 {
-  NS_LOG_FUNCTION (" state " << m_state << " now " << Simulator::Now ());
+  NS_LOG_UNCOND ("THzMacMacroClient::SendPacket state " << m_state << " now " << Simulator::Now ());
 
   if (m_state == IDLE || m_state == WAIT_TX)
     {
@@ -608,11 +896,11 @@ THzMacMacroClient::SendPacketDone (Ptr<Packet> packet)
       break;
 
     case THZ_PKT_TYPE_DATA:
-      NS_LOG_UNCOND (Simulator::Now() << " - " << m_nodeId << " - DATA Tx finished. Seq: " << header.GetSequence());
+      NS_LOG_DEBUG (Simulator::Now() << " - " << m_nodeId << " - DATA Tx finished. Seq: " << header.GetSequence());
       m_state = WAIT_ACK;
       if (header.GetDestination () == GetBroadcast ())
         {
-          NS_LOG_UNCOND (Simulator::Now() << " - ERROR. Broadcast not supported");
+          NS_LOG_DEBUG (Simulator::Now() << " - ERROR. Broadcast not supported");
           return;
         }
       break;
@@ -625,10 +913,11 @@ THzMacMacroClient::SendPacketDone (Ptr<Packet> packet)
 void
 THzMacMacroClient::ReceiveAck (Ptr<Packet> packet)
 {
+  NS_LOG_UNCOND("THzMacMacroClient::ReceiveAck at node " << m_nodeId);
   NS_LOG_FUNCTION ("at node " << m_nodeId);
   THzMacHeader header;
   packet->RemoveHeader (header);
-  
+
   if (header.GetDestination () == m_address)
     {
       m_state = IDLE;
@@ -645,7 +934,7 @@ THzMacMacroClient::ReceiveAck (Ptr<Packet> packet)
             }
         }
     }
-  else 
+  else
   {
     NS_LOG_DEBUG (Simulator::Now() << " - " << m_nodeId << " - ACK was not for me");
   }
@@ -689,8 +978,8 @@ THzMacMacroClient::SendDataDone (bool success, uint16_t sequence)
               m_throughputavg = m_throughputAll / (m_ite);
               m_traceThroughput (m_throughputavg);
               NS_LOG_UNCOND (m_nodeId << " - *** Successfully Sent Packet number " << m_send << " from node " << m_nodeId << " Discard " << m_discard << " Total send " << (m_send + m_discard) << " #queue " << m_pktQueue.size () << ". S [bps]= " << m_throughputavg);
-              NS_LOG_DEBUG ("  throughput : " << m_throughput << " of node " << m_nodeId);
-              NS_LOG_DEBUG ("  average throughput : " << m_throughputavg << " of node " << m_nodeId);
+              NS_LOG_UNCOND ("  throughput : " << m_throughput << " of node " << m_nodeId);
+              NS_LOG_UNCOND ("  average throughput : " << m_throughputavg << " of node " << m_nodeId);
             }
           else
             {
@@ -702,7 +991,7 @@ THzMacMacroClient::SendDataDone (bool success, uint16_t sequence)
               result.discard = true;
               m_result.push_front (result);
               Simulator::ScheduleNow (&THzMacMacroClient::ResultsRecord,this);
-              NS_LOG_UNCOND (m_nodeId << " - !!!!! Discard Packet number " << m_discard << " from node " << m_nodeId << " Total send " << (m_send + m_discard) << " #queue " << m_pktQueue.size ());
+              NS_LOG_DEBUG (m_nodeId << " - !!!!! Discard Packet number " << m_discard << " from node " << m_nodeId << " Total send " << (m_send + m_discard) << " #queue " << m_pktQueue.size ());
 
             }
           NS_LOG_DEBUG ("NODE: " << m_nodeId << " SEND DATA DONE: m_sequence = " << sequence);
@@ -713,8 +1002,8 @@ THzMacMacroClient::SendDataDone (bool success, uint16_t sequence)
 
 // -------------------------- Timeout ----------------------------------
 
-void 
-THzMacMacroClient::CtsTimeout (uint16_t sequence) 
+void
+THzMacMacroClient::CtsTimeout (uint16_t sequence)
 {
   m_state = IDLE;
   std::list<Rec>::iterator it = m_rec.begin ();
@@ -735,8 +1024,8 @@ THzMacMacroClient::CtsTimeout (uint16_t sequence)
               m_backoffSeq = it -> RecSeq;
               Ptr<UniformRandomVariable> uv = CreateObject<UniformRandomVariable> ();
               it->BackoffLife = uv->GetInteger (1, pow (double(2.0), double(it->RecRetry))); // Set Backoff life
-              NS_LOG_UNCOND (Simulator::Now() << " - " << m_nodeId << " - CTS Timeout. Number of tries: " << it->RecRetry << " BO life: " << it->BackoffLife);
-              
+              NS_LOG_DEBUG (Simulator::Now() << " - " << m_nodeId << " - CTS Timeout. Number of tries: " << it->RecRetry << " BO life: " << it->BackoffLife);
+
             }
           CollisionsRecord(it->RecRetry);
           m_ctsReceived = 0;
@@ -749,6 +1038,7 @@ THzMacMacroClient::CtsTimeout (uint16_t sequence)
 void
 THzMacMacroClient::AckTimeout (uint16_t sequence)
 {
+  NS_LOG_UNCOND("Ack timeout at client");
   m_state = IDLE;
   std::list<AckTimeouts>::iterator ait = m_ackTimeouts.begin ();
   for (; ait != m_ackTimeouts.end (); )
@@ -764,9 +1054,9 @@ THzMacMacroClient::AckTimeout (uint16_t sequence)
         }
     }
   NS_LOG_DEBUG ("!!! ACK timeout !!!");
-  if(m_ways == 3) 
-    { 
-      NS_LOG_UNCOND (Simulator::Now() << " - *** ERROR *** ACK should always be received... (no DATA collisions in ADAPT-3)"); 
+  if(m_ways == 3)
+    {
+      NS_LOG_UNCOND (Simulator::Now() << " - *** ERROR *** ACK should always be received... (no DATA collisions in ADAPT-3)");
     }
 
   std::list<Rec>::iterator it = m_rec.begin ();
@@ -788,7 +1078,7 @@ THzMacMacroClient::AckTimeout (uint16_t sequence)
               m_backoffSeq = it -> RecSeq;
               Ptr<UniformRandomVariable> uv = CreateObject<UniformRandomVariable> ();
               it->BackoffLife = uv->GetInteger (1, pow (double(2.0), double(it->RecRetry)));  // Set Backoff life. Minimum 1, if min is set to 0, GetInteger() doesn't work
-              NS_LOG_UNCOND (Simulator::Now() << " - " << m_nodeId << " - ------ ACK TIMEOUT. Backoff Life: " << it->BackoffLife);
+              NS_LOG_DEBUG (Simulator::Now() << " - " << m_nodeId << " - ------ ACK TIMEOUT. Backoff Life: " << it->BackoffLife);
             }
             CollisionsRecord(it->RecRetry);
             return;
@@ -805,6 +1095,7 @@ THzMacMacroClient::AttachPhy (Ptr<THzPhy> phy)
 void
 THzMacMacroClient::SetDevice (Ptr<THzNetDevice> dev)
 {
+  NS_LOG_UNCOND("THzMacMacroClient::SetDevice");
   m_device = dev;
 }
 
@@ -890,6 +1181,9 @@ THzMacMacroClient::StateToString (State state)
       return "RX";
     case COLL:
       return "COLL";
+    case AP_DISCOVERY:
+      return "AP_DISCOVERY";
+    
     default:
       return "??";
     }
@@ -937,6 +1231,9 @@ THzMacMacroClient::GetMaxBackoff()
 }
 
 
+/***************Record functions below**************/
+
+
 void
 THzMacMacroClient::ResultsRecord ()
 {
@@ -982,7 +1279,7 @@ THzMacMacroClient::StateRecord (uint16_t state)
   /*----------------------------------------------------------------------------------------
    * enable the state printing in a .txt file by uncommenting the content in this function
    *----------------------------------------------------------------------------------------*/
-/*
+  /*
    std::stringstream txtname;
    txtname << "scratch/state_" << outputFile;
    std::string filename = txtname.str ();
@@ -993,7 +1290,7 @@ THzMacMacroClient::StateRecord (uint16_t state)
    resultfile.close ();
    return;
 */
-}
+   }
 
 
 void THzMacMacroClient::PositionsRecord ()
@@ -1001,8 +1298,8 @@ void THzMacMacroClient::PositionsRecord ()
   /*----------------------------------------------------------------------------------------
    * enable the node position printing in a .txt file by uncommenting the content in this function
    *----------------------------------------------------------------------------------------*/
-  
-/*
+
+  /*
   RngSeedManager seed;
   int seed_num = seed.GetSeed ();
 
@@ -1015,10 +1312,53 @@ void THzMacMacroClient::PositionsRecord ()
 
   std::ofstream resultfile;
   resultfile.open (filename.c_str (), std::ios::app);
-  resultfile << m_nodeId << "\t" << pos.x << "\t" << pos.y << std::endl;
+  resultfile << m_nodeId << "\t" << pos.x << "\t" << pos.y << "\t" << m_angle << std::endl;
   resultfile.close ();
   return;
-*/
+  */
+}
+
+void
+THzMacMacroClient::DiscoveryTimeRecord ()
+{
+  /*----------------------------------------------------------------------------------------
+   * enable the result printing in a .txt file by uncommenting the content in this function
+   *----------------------------------------------------------------------------------------*/
+
+  NS_LOG_UNCOND("In DiscoveryTimeRecord node " <<  m_nodeId);
+   std::stringstream txtname;
+   txtname << "scratch/DiscoveryTime_" << outputFile;
+   std::string filename = txtname.str ();
+
+   std::ofstream resultfile;
+   resultfile.open (filename.c_str (), std::ios::app);
+   resultfile << m_nodeId << "\t" <<  rounds << "\t" << m_angle << "\t" <<  Simulator::Now().GetNanoSeconds() <<  std::endl;
+   resultfile.close ();
+   rounds=0;
+   return;
+
+}
+
+
+void
+THzMacMacroClient::ReDiscoveryTimeRecord (Time reDiscoveryTime)
+{
+  /*----------------------------------------------------------------------------------------
+   * enable the result printing in a .txt file by uncommenting the content in this function
+   *----------------------------------------------------------------------------------------*/
+
+  NS_LOG_UNCOND("In ReDiscoveryTimeRecord node " <<  m_nodeId);
+   std::stringstream txtname;
+   txtname << "scratch/ReDiscoveryTime_" << outputFile;
+   std::string filename = txtname.str ();
+
+   std::ofstream resultfile;
+   resultfile.open (filename.c_str (), std::ios::app);
+   resultfile << m_nodeId << "\t" << reDiscoveryTime.GetNanoSeconds()  <<  std::endl;
+   resultfile.close ();
+   
+   return;
+
 }
 
 } /* namespace ns3 */
