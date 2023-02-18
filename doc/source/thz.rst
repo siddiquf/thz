@@ -206,7 +206,7 @@ The following examples have been written, which can be found in ``/thz/examples/
 
 * macro-central.cc: This example file is for the macroscale scenario of the THz-band communication networks, i.e., with transmission distance larger than several meters. A centralized network architecture is implemented. A high speed turning directional antenna is used in the base station (Servernodes), while all clients (Clientnodes) point the directional antennas towards the receiver. 
 
-*v1.1.1 macro-central.cc: A high speed turning directional antenna is used in both the base station and the client. Link discovery is performed  by clients to discover the AP and be able to transmit data.
+* v1.1.1 macro-central.cc: A high speed turning directional antenna is used in both the base station and the client. Link discovery is performed  by clients to discover the AP and be able to transmit data.
 
 Important parameters:
 
