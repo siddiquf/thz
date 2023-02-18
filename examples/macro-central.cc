@@ -19,6 +19,9 @@
  *         Zahed Hossain <zahedhos@buffalo.edu>
  *         Josep Miquel Jornet <j.jornet@northeastern.edu>
  *         Daniel Morales <danimoralesbrotons@gmail.com>
+ * 
+ * Modified by: Farhan Siddiqui <farhansi@gmail.com>
+             Bikash Mazumdar <bikashmazumdar2000@gmail.com>
  */
 
 #include <vector>
@@ -85,21 +88,25 @@ int main (int argc, char* argv[])
     double csth_BPSK, csth_QPSK, csth_8PSK, csth_16QAM, csth_64QAM;
     Time prop_delay;
 
-    int configuration = 20;           // Config 20: IEEE 802.15.3d, 30 sectors, 18m, 8PSK+ -- Config 29: IEEE 802.15.3d, 30 sectors, 7.5m, 64-QAM.
+    int configuration = 21;           // Config 20: IEEE 802.15.3d, 30 sectors, 18m, 8PSK+ -- Config 29: IEEE 802.15.3d, 30 sectors, 7.5m, 64-QAM.
     int seedNum = 1;
     int nodeNum = 50;
     int handshake_ways = 3;           // 0: CSMA, 1: ADAPT-1, 2: CSMA/CA, 3: ADAPT-3
     int packetSize = 65000;           // Bytes 
-    int interArrivalTime = 200;       // microseconds
-    double simDuration = 0.01;        // seconds
+    int interArrivalTime = 500;       // microseconds
+    double simDuration = 0.01;        // seconds 
     int boSlots = 5;                  // number of slots in the random backoff
     int rtsLim = 5;
     double temperature = 300;
-    bool use_whiteList = true;
-    bool use_adaptMCS = true;
+    bool use_whiteList = false;       
+    bool use_adaptMCS = false;       
 
     CommandLine cmd;
+
+    NS_LOG_UNCOND("MACRO CENTRAL...");
+
     cmd.AddValue("seedNum", "Seed number", seedNum);
+    cmd.AddValue("configuration", "Configuration", configuration);
     cmd.AddValue("nodeNum", "Number of Clients", nodeNum);
     cmd.AddValue("way", "Chose handshake ways", handshake_ways);
     cmd.AddValue("packetSize", "Packet size in bytes", packetSize);
@@ -159,7 +166,7 @@ int main (int argc, char* argv[])
           {
             mcs = _8PSK;                 
             sectors = 30;
-            radius = 18;
+            radius = 18; 
           }
         if (configuration == 21) // 64-QAM, 45 sectors, 17m
           {
@@ -321,7 +328,7 @@ int main (int argc, char* argv[])
         Config::SetDefault ("ns3::THzSpectrumValueFactory::NumSubBand", DoubleValue (32));
       }
     
-    std::string outputFile = "result_" + std::to_string(handshake_ways) + "way_" + std::to_string(nodeNum) + "n_" + std::to_string(interArrivalTime) + "us_" + std::to_string(seedNum) + ".txt";
+    std::string outputFile = "result_" + std::to_string(handshake_ways) + "way_" + std::to_string(nodeNum) + "n_" + std::to_string(interArrivalTime) +  "us_" + "Config" + std::to_string(configuration) + "_" + std::to_string(seedNum) + ".txt";
     
     RngSeedManager seed;
     seed.SetSeed (seedNum);
@@ -348,7 +355,7 @@ int main (int argc, char* argv[])
     mobility.SetPositionAllocator ("ns3::UniformDiscPositionAllocator",
                                   "X", DoubleValue (0.0),
                                   "Y", DoubleValue (0.0),
-                                  "rho", DoubleValue (radius));
+                                  "rho", DoubleValue (radius)); 
     mobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
     mobility.Install (Clientnodes);
 
@@ -394,6 +401,7 @@ int main (int argc, char* argv[])
         thzMacClient.Set ("DataRate", DoubleValue(dataRate));
         thzMacClient.Set ("PropDelay", TimeValue(prop_delay));
         thzMacClient.Set ("HandshakeWays", UintegerValue(handshake_ways));
+        thzMacClient.Set ("Radius", DoubleValue(radius));
 
         // Directional Antenna     
         THzDirectionalAntennaHelper thzDirAntenna = THzDirectionalAntennaHelper::Default ();
@@ -520,19 +528,36 @@ int main (int argc, char* argv[])
       }
 
     /* --------------------------------- START SIMULATION --------------------------------- */
+  ApplicationContainer sourceApps;
+  ApplicationContainer sinkApps;
+  uint16_t sinkPort = 20000;
 
-    THzUdpServerHelper Server (9);
-    ApplicationContainer Apps = Server.Install (Servernodes);
-    Apps.Start (Seconds (0.0));
-    Apps.Stop (Seconds (10.0));
+  sinkApps.Start (Seconds (0));
+  sinkApps.Stop (Seconds (10));
 
-    THzUdpClientHelper Client (iface.GetAddress (0), 9);
-    Client.SetAttribute ("PacketSize", UintegerValue (packetSize));
-    Client.SetAttribute ("Mean", DoubleValue (interArrivalTime));
-    Apps = Client.Install (Clientnodes);
-    Apps.Start(MicroSeconds (15));
-    Apps.Stop (Seconds (10.0));
+  for (uint16_t i = 0; i < Clientnodes.GetN (); i++)
+  {
+    Ptr<Node> clientNode = Clientnodes.Get (i);
+    uint32_t serverId = Servernodes.Get (0)->GetId();
+    uint32_t clientId = clientNode->GetId();
 
+    NS_LOG_UNCOND("i: " << i << " clientId "  << clientId << " serverId " << serverId);
+
+    PacketSinkHelper packetSinkHelper ("ns3::UdpSocketFactory", InetSocketAddress (Ipv4Address::GetAny (), sinkPort));
+    sinkApps.Add (packetSinkHelper.Install (Servernodes));
+
+      // UdpClient on client
+      UdpClientHelper dlClient (iface.GetAddress (0), sinkPort);
+      dlClient.SetAttribute ("Interval", TimeValue (MicroSeconds (interArrivalTime)));
+      dlClient.SetAttribute ("PacketSize", UintegerValue (packetSize));
+      dlClient.SetAttribute ("MaxPackets", UintegerValue (0xFFFFFFFF));
+      sourceApps.Add (dlClient.Install (clientNode));
+      sourceApps.Get(i)->SetStartTime(Seconds ( ((clientId)* 0.0001))); //data app starts at different time on each client node 
+      sourceApps.Get(i)->SetStopTime (Seconds (10));
+
+      sinkPort++;
+  }
+    
     Simulator::Stop (Seconds (simDuration + 0.000001));
     ConfigStore config;
     config.ConfigureDefaults ();
