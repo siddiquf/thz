@@ -144,14 +144,14 @@ THzSpectrumPropagationLoss::CalculateAbsLoss (double f, double d)
   else
   {
     std::ifstream AbsCoefile;
-    AbsCoefile.open ("contrib/thz/model/data_AbsCoe.txt", std::ifstream::in);
+    AbsCoefile.open ("src/thz/model/data_AbsCoe.txt", std::ifstream::in);
     if (!AbsCoefile.is_open ())
         {
         NS_FATAL_ERROR ("THzSpectrumPropagationLoss::CalculateAbsLoss: open data_AbsCoe.txt failed 1");
         }
 
     std:: ifstream frequencyfile;
-    frequencyfile.open ("contrib/thz/model/data_frequency.txt", std::ifstream::in);
+    frequencyfile.open ("src/thz/model/data_frequency.txt", std::ifstream::in);
     if (!frequencyfile.is_open ())
         {
         NS_FATAL_ERROR ("THzSpectrumPropagationLoss::CalculateAbsLoss: open data_frequency.txt failed");
@@ -204,7 +204,7 @@ Ptr<SpectrumValue>
 THzSpectrumPropagationLoss::LoadedAbsCoe (int s, int j, double f, double d,Ptr<const SpectrumValue> txPsd) const
 {
   std:: ifstream AbsCoefile;
-  AbsCoefile.open ("contrib/thz/model/data_AbsCoe.txt", std::ifstream::in);
+  AbsCoefile.open ("src/thz/model/data_AbsCoe.txt", std::ifstream::in);
   if (!AbsCoefile.is_open ())
     {
       NS_FATAL_ERROR ("THzSpectrumPropagationLoss::LoadedAbsCoe: open data_AbsCoe.txt failed");
