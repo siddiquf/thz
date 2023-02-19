@@ -95,7 +95,7 @@ Building THz Module on ns-3-dev (instructions are for the new v1.1.1 version wit
     $ cd $NS3_DEV_HOME/ns-3-dev/src/ 
     $ git clone -b link-discovery https://github.com/siddiquf/thz.git
 
-* Build and install TeraSim v1.1.1 inside ``$THZ_HOME``  ::
+* Build and install TeraSim v1.1.1  ::
 
     $ cd $NS3_DEV_HOME/ns-3-dev
     $ ./ns3 configure --enable-examples
