@@ -93,7 +93,7 @@ Building THz Module on ns-3-dev (instructions are for the new v1.1.1 version wit
 
 * Now, clone the link-discovery branch of THz from the github repository inside $NS3_DEV_HOME/src/)
 
- $ git clone -b linux-discovery https://github.com/siddiquf/thz.git
+ $ git clone -b link-discovery https://github.com/siddiquf/thz.git
 
 * In $THZ_HOME/model/thz-dir-antenna.cc replace all occurrences of rxAngles.phi and txAngles.phi by rxAngles.GetAzimuth() and txAngles.GetAzimuth()
 
