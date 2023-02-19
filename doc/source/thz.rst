@@ -97,7 +97,7 @@ Building THz Module on ns-3-dev (instructions are for the new v1.1.1 version wit
 
 * In ``$THZ_HOME/model/thz-dir-antenna.cc`` replace all occurrences of rxAngles.phi and txAngles.phi by rxAngles.GetAzimuth() and txAngles.GetAzimuth()
 
-* If ``$THZ_HOME`` is ``$NS3_DEV_HOME/src/``, then update the paths of ``data_frequency.txt`` and ``data_AbsCoe.txt`` in ``$THZ_HOME/model/thz-spectrum-propagation-loss.cc`` and ``$THZ_HOME/model/thz-spectrum-waveform.cc`` files by replacing ``contrib`` with ``src``.
+* Update the paths of ``data_frequency.txt`` and ``data_AbsCoe.txt`` in ``$THZ_HOME/model/thz-spectrum-propagation-loss.cc`` and ``$THZ_HOME/model/thz-spectrum-waveform.cc`` files by replacing ``contrib`` with ``src``.
 
 * Build and install TeraSim v1.1.1 and inside ``$THZ_HOME``  ::
 
@@ -107,9 +107,9 @@ Building THz Module on ns-3-dev (instructions are for the new v1.1.1 version wit
     $ ``cp $THZ_HOME/examples/macro-central.cc`` ``$NS3_DEV_HOME/ns3.33/scratch/``
     $ ``./ns3 run ``scratch/macro-central``
 
-Optionally, run the example with customized argurments
+Optionally, run the example with customized arguments (example shown below)
 
-    $ ./ns3 run "scratch/macro-central --configuration=27 --nodeNum=50 seedNum=3"
+    $ ./ns3 run "scratch/macro-central --configuration=28 --nodeNum=50 seedNum=3"
 
 
 Helpers
@@ -196,7 +196,7 @@ The link layer performance in terms of the throughput and the discarding probabi
 
 In the case of macroscale scenario with the ADAPT procotol, the output is a TXT file with an entry for each packet with the format (client_id, packet_size, packet_delay, success, discard). This can be then postprocessed to obtain the desired metrics, such as throughput or discard rate, both overall and per node. A MATALB script is provided in ``/thz/macro_postprocessing/compute_metrics.m``.
 
-In the case of v1.1.1 (ADAPT with added link discovery extension), TXT files are generated for initial discovery time and for rediscovery time. The initial discovery time files contain an entry for each node that discovers the AP with the format (cliend_id, number_of_rotations_of client_antenna, client_antenna_orientation_at_discovery, discovery_time (in nanosec)). The rediscovery time files contain an entry for each node that rediscovers the AP with the format (client_id, rediscovery_time (in nanosec). Two different MATLAB scripts (box_plot_initial_discovery_and_rediscovery.m and CDF_plot_initial_discovery_and_rediscovery.m are provided that can generate the box plot and CDF of initial discovery and rediscovery time recorded for 10 trials. 
+In the case of v1.1.1 (ADAPT with added link discovery extension), TXT files are generated for initial discovery time and for rediscovery time. The initial discovery time files contain an entry for each node that discovers the AP with the format (cliend_id, number_of_rotations_of client_antenna, client_antenna_orientation_at_discovery, discovery_time (in nanosec)). The rediscovery time files contain an entry for each node that rediscovers the AP with the format (client_id, rediscovery_time (in nanosec). Two different MATLAB scripts (box_plot_initial_discovery_and_rediscovery.m and CDF_plot_initial_discovery_and_rediscovery.m are provided that can generate the box plot and CDF of initial discovery and rediscovery time recorded for 10 trials. Number of trials can be altered as desired.
 
 Examples
 ===============
