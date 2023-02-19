@@ -94,12 +94,12 @@ Building THz Module on ns-3-dev (instructions are for the new v1.1.1 version wit
 
     $ git clone -b link-discovery https://github.com/siddiquf/thz.git
 
-* Build and install TeraSim v1.1.1 and inside ``$THZ_HOME``  ::
+* Build and install TeraSim v1.1.1 inside ``$THZ_HOME``  ::
 
     $ cd $NS3_DEV_HOME/ns-3-dev
     $ ./ns3 configure --enable-examples
     $ ./ns3
-    $ cp $THZ_HOME/examples/macro-central.cc $NS3_DEV_HOME/scratch/
+    $ cp $NS3_DEV_HOME/ns-3-dev/src/thz/examples/macro-central.cc $NS3_DEV_HOME/ns-3-dev/scratch
     $ ./ns3 run scratch/macro-central
 
 Optionally, run the example with customized arguments (example shown below)::
