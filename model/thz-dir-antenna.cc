@@ -229,7 +229,7 @@ double
 THzDirectionalAntenna::GetRxGainDb (Ptr<MobilityModel> senderMobility, Ptr<MobilityModel> recvMobility)
 {
   Angles rxAngles (senderMobility->GetPosition (), recvMobility->GetPosition ());
-  double phi_rx = rxAngles.phi - m_RxorientationRadians;
+  double phi_rx = rxAngles.GetAzimuth() - m_RxorientationRadians;
   while (phi_rx <= -M_PI)
     {
       phi_rx += M_PI + M_PI;
@@ -296,9 +296,9 @@ THzDirectionalAntenna::GetTxGainDb (Ptr<MobilityModel> senderMobility, Ptr<Mobil
 {
   NS_LOG_UNCOND("THzDirectionalAntenna::GetTxGainDb");
   Angles txAngles (recvMobility->GetPosition (), senderMobility->GetPosition ());
-  double m_TxorientationRadians = txAngles.phi;
+  double m_TxorientationRadians = txAngles.GetAzimuth();
   NS_LOG_UNCOND("THzDirectionalAntenna::GetTxGainDb 1:" << m_TxorientationRadians);
-  double phi_tx = txAngles.phi - m_TxorientationRadians;
+  double phi_tx = txAngles.GetAzimuth() - m_TxorientationRadians;
   while (phi_tx <= -M_PI)
     {
       phi_tx += M_PI + M_PI;
@@ -330,8 +330,8 @@ THzDirectionalAntenna::GetAntennaGain (Ptr<MobilityModel> XnodeMobility, Ptr<Mob
   if (XnodeMode == 1 && YnodeMode == 0) // (1--Directional Receiver; 0--Directional Transmitter) 
     {
       Angles rxAngles (YnodeMobility->GetPosition (), XnodeMobility->GetPosition ());// 
-      double phi_rx = rxAngles.phi - m_RxorientationRadians; 
-      NS_LOG_DEBUG("XnodeMode == 1 && YnodeMode == 0 rxAngles.phi is "<< rxAngles.phi << " and phi_rx is " << phi_rx );
+      double phi_rx = rxAngles.GetAzimuth() - m_RxorientationRadians; 
+      NS_LOG_DEBUG("XnodeMode == 1 && YnodeMode == 0 rxAngles.GetAzimuth() is "<< rxAngles.GetAzimuth() << " and phi_rx is " << phi_rx );
       while (phi_rx <= -M_PI)
         {
           phi_rx += M_PI + M_PI;
@@ -340,16 +340,16 @@ THzDirectionalAntenna::GetAntennaGain (Ptr<MobilityModel> XnodeMobility, Ptr<Mob
         {
           phi_rx -= M_PI + M_PI;
         }
-      NS_LOG_DEBUG("after adjustment: XnodeMode == 1 && YnodeMode == 0 rxAngles.phi is "<< rxAngles.phi << " and phi_rx is " << phi_rx );
+      NS_LOG_DEBUG("after adjustment: XnodeMode == 1 && YnodeMode == 0 rxAngles.GetAzimuth() is "<< rxAngles.GetAzimuth() << " and phi_rx is " << phi_rx );
       double ef_rx = std::pow (std::cos (phi_rx / 2.0), m_exponent); 
       double m_rxgainDb = 20 * std::log10 (ef_rx); //conversion of rx gain to db
       NS_LOG_DEBUG ("   GetRxGainDb " << m_rxgainDb + m_maxGain);
       m_RxGain = m_rxgainDb + m_maxGain;
       Angles txAngles (XnodeMobility->GetPosition (), YnodeMobility->GetPosition ()); 
     
-      double phi_tx = txAngles.phi - m_TxorientationRadians;
+      double phi_tx = txAngles.GetAzimuth() - m_TxorientationRadians;
 
-      NS_LOG_DEBUG("XnodeMode == 1 && YnodeMode == 0 txAngles.phi is "<< txAngles.phi << " and phi_tx is " << phi_tx);
+      NS_LOG_DEBUG("XnodeMode == 1 && YnodeMode == 0 txAngles.GetAzimuth() is "<< txAngles.GetAzimuth() << " and phi_tx is " << phi_tx);
       
       while (phi_tx <= -M_PI)
         {
@@ -359,7 +359,7 @@ THzDirectionalAntenna::GetAntennaGain (Ptr<MobilityModel> XnodeMobility, Ptr<Mob
         {
           phi_tx -= M_PI + M_PI;
         }
-      NS_LOG_DEBUG("after adjustment: XnodeMode == 1 && YnodeMode == 0 txAngles.phi is "<< txAngles.phi << " and phi_tx is " << phi_tx);
+      NS_LOG_DEBUG("after adjustment: XnodeMode == 1 && YnodeMode == 0 txAngles.GetAzimuth() is "<< txAngles.GetAzimuth() << " and phi_tx is " << phi_tx);
      
       NS_LOG_DEBUG ("1-Rx = " << m_RxorientationRadians * 180.0 / M_PI << " Tx = " << m_TxorientationRadians * 180.0 / M_PI << " NOW: " << Simulator::Now () );
       double ef_tx = std::pow (std::cos (phi_tx / 2.0), m_exponent);
@@ -370,7 +370,7 @@ THzDirectionalAntenna::GetAntennaGain (Ptr<MobilityModel> XnodeMobility, Ptr<Mob
   else if (XnodeMode == 0 && YnodeMode == 1) //  (1--Directional Receiver; 0--Directional Transmitter)
     {
       Angles rxAngles (XnodeMobility->GetPosition (), YnodeMobility->GetPosition ()); 
-      double phi_rx = rxAngles.phi - m_RxorientationRadians;
+      double phi_rx = rxAngles.GetAzimuth() - m_RxorientationRadians;
       
       while (phi_rx <= -M_PI)
         {
@@ -386,7 +386,7 @@ THzDirectionalAntenna::GetAntennaGain (Ptr<MobilityModel> XnodeMobility, Ptr<Mob
       NS_LOG_DEBUG ("   GetRxGainDb " << m_rxgainDb + m_maxGain);
       m_RxGain = m_rxgainDb + m_maxGain;
       Angles txAngles (YnodeMobility->GetPosition (), XnodeMobility->GetPosition ()); 
-      double phi_tx = txAngles.phi - m_TxorientationRadians; 
+      double phi_tx = txAngles.GetAzimuth() - m_TxorientationRadians; 
    
       NS_LOG_UNCOND("phi_tx is " << phi_tx);
      
@@ -409,7 +409,7 @@ THzDirectionalAntenna::GetAntennaGain (Ptr<MobilityModel> XnodeMobility, Ptr<Mob
     {
       NS_LOG_UNCOND("OMNIdirectional antenna!");
       Angles rxAngles (XnodeMobility->GetPosition (), YnodeMobility->GetPosition ());
-      double phi_rx = rxAngles.phi - m_RxorientationRadians;
+      double phi_rx = rxAngles.GetAzimuth() - m_RxorientationRadians;
       while (phi_rx <= -M_PI)
         {
           phi_rx += M_PI + M_PI;
@@ -423,8 +423,8 @@ THzDirectionalAntenna::GetAntennaGain (Ptr<MobilityModel> XnodeMobility, Ptr<Mob
       NS_LOG_DEBUG ("   GetRxGainDb " << m_rxgainDb + m_maxGain);
       m_RxGain = m_rxgainDb + m_maxGain;
       Angles txAngles (XnodeMobility->GetPosition (), YnodeMobility->GetPosition ());
-      double m_TxorientationRadians = txAngles.phi;
-      double phi_tx = txAngles.phi - m_TxorientationRadians;
+      double m_TxorientationRadians = txAngles.GetAzimuth();
+      double phi_tx = txAngles.GetAzimuth() - m_TxorientationRadians;
       
       while (phi_tx <= -M_PI)
         {
