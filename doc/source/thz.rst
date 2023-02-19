@@ -88,24 +88,24 @@ Building THz Module on ns-3-dev (instructions are for the new v1.1.1 version wit
 ===============================
 * The first step is to clone NS3-DEV inside ``$NS3_DEV_HOME``
 
-    $ cd ``$NS3_DEV_HOME``
-    $ git clone https://gitlab.com/nsnam/ns-3-dev.git
+ $ cd $NS3_DEV_HOME
+ $ git clone https://gitlab.com/nsnam/ns-3-dev.git
 
-* Now, clone the link-discovery branch of THz from the github repository inside ``$NS3_DEV_HOME/src/``)
+* Now, clone the link-discovery branch of THz from the github repository inside $NS3_DEV_HOME/src/)
 
-    $ git clone -b linux-discovery https://github.com/siddiquf/thz.git
+ $ git clone -b linux-discovery https://github.com/siddiquf/thz.git
 
-* In ``$THZ_HOME/model/thz-dir-antenna.cc`` replace all occurrences of rxAngles.phi and txAngles.phi by rxAngles.GetAzimuth() and txAngles.GetAzimuth()
+* In $THZ_HOME/model/thz-dir-antenna.cc replace all occurrences of rxAngles.phi and txAngles.phi by rxAngles.GetAzimuth() and txAngles.GetAzimuth()
 
 * Update the paths of ``data_frequency.txt`` and ``data_AbsCoe.txt`` in ``$THZ_HOME/model/thz-spectrum-propagation-loss.cc`` and ``$THZ_HOME/model/thz-spectrum-waveform.cc`` files by replacing ``contrib`` with ``src``.
 
 * Build and install TeraSim v1.1.1 and inside ``$THZ_HOME``  ::
 
-    $ ``cd $NS3_DEV_HOME``
-    $ ``./ns3 configure --enable-examples``
-    $ ``./ns3``
-    $ ``cp $THZ_HOME/examples/macro-central.cc`` ``$NS3_DEV_HOME/ns3.33/scratch/``
-    $ ``./ns3 run ``scratch/macro-central``
+    $ cd $NS3_DEV_HOME
+    $ ./ns3 configure --enable-examples
+    $ ./ns3
+    $ cp $THZ_HOME/examples/macro-central.cc $NS3_DEV_HOME/ns3.33/scratch/
+    $ ./ns3 run scratch/macro-central
 
 Optionally, run the example with customized arguments (example shown below)
 
