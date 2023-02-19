@@ -96,7 +96,7 @@ Building THz Module on ns-3-dev (instructions are for the new v1.1.1 version wit
 
 * Build and install TeraSim v1.1.1 and inside ``$THZ_HOME``  ::
 
-    $ cd $NS3_DEV_HOME
+    $ cd $NS3_DEV_HOME/ns-3-dev
     $ ./ns3 configure --enable-examples
     $ ./ns3
     $ cp $THZ_HOME/examples/macro-central.cc $NS3_DEV_HOME/scratch/
