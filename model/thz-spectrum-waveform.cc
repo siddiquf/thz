@@ -18,6 +18,9 @@
  * Author: Qing Xia <qingxia@buffalo.edu>
  *         Zahed Hossain <zahedhos@buffalo.edu>
  *         Josep Miquel Jornet <j.jornet@northeastern.edu>
+ *
+ * Modified by: Farhan Siddiqui <farhansi@gmail.com>
+ *              Bikash Mazumdar <bikashmazumdar2000@gmail.com>
  */
 
 
@@ -88,7 +91,7 @@ THzSpectrumValueFactory::THzSpectrumWaveformInitializer ()
   NS_LOG_DEBUG ("CHECK: THzSpectrumWaveformInitializer: m_numsb = " << m_numsb);
 
   std:: ifstream frequencyfile;
-  frequencyfile.open ("contrib/thz/model/data_frequency.txt", std::ifstream::in);
+  frequencyfile.open ("src/thz/model/data_frequency.txt", std::ifstream::in);
   if (!frequencyfile.is_open ())
     {
       NS_LOG_UNCOND ("THzSpectrumValueFactory::THzSpectrumWaveformInitializer: open data_frequency.txt failed");
@@ -130,7 +133,7 @@ Ptr<SpectrumModel>
 THzSpectrumValueFactory::AllTHzSpectrumWaveformInitializer ()
 {
   std:: ifstream frequencyfile;
-  frequencyfile.open ("contrib/thz/model/data_frequency.txt", std::ifstream::in);
+  frequencyfile.open ("src/thz/model/data_frequency.txt", std::ifstream::in);
   if (!frequencyfile.is_open ())
     {
       NS_LOG_UNCOND ( "THzSpectrumValueFactory::AllTHzSpectrumWaveformInitializer: open data_frequency.txt failed" );
@@ -160,7 +163,7 @@ Ptr<SpectrumModel>
 THzSpectrumValueFactory::THzPulseSpectrumWaveformInitializer ()
 {
   std:: ifstream frequencyfile;
-  frequencyfile.open ("contrib/thz/model/data_frequency.txt", std::ifstream::in);
+  frequencyfile.open ("src/thz/model/data_frequency.txt", std::ifstream::in);
   if (!frequencyfile.is_open ())
     {
       NS_LOG_UNCOND ( "THzSpectrumValueFactory::THzPulseSpectrumWaveformInitializer: open data_frequency.txt failed" );
@@ -194,7 +197,7 @@ int
 THzSpectrumValueFactory::FreqSeqStart ()    // return sequence number of the first frequency band
 {
   std:: ifstream frequencyfile;
-  frequencyfile.open ("contrib/thz/model/data_frequency.txt", std::ifstream::in);
+  frequencyfile.open ("src/thz/model/data_frequency.txt", std::ifstream::in);
   if (!frequencyfile.is_open ())
     {
       NS_LOG_UNCOND ( "THzSpectrumValueFactory::FreqSeqStart: open data_frequency.txt failed" );
@@ -221,7 +224,7 @@ double
 THzSpectrumValueFactory::FreqStartValue ()
 {
   std:: ifstream frequencyfile;
-  frequencyfile.open ("contrib/thz/model/data_frequency.txt", std::ifstream::in);
+  frequencyfile.open ("src/thz/model/data_frequency.txt", std::ifstream::in);
   if (!frequencyfile.is_open ())
     {
       NS_LOG_UNCOND ( "THzSpectrumValueFactory::FreqStartValue: open data_frequency.txt failed" );
@@ -243,7 +246,7 @@ THzSpectrumValueFactory::FreqBands ()
 {
   Ptr<SpectrumValue> f_store = Create <SpectrumValue> (m_THzSpectrumWaveform);
   std:: ifstream frequencyfile;
-  frequencyfile.open ("contrib/thz/model/data_frequency.txt", std::ifstream::in);
+  frequencyfile.open ("src/thz/model/data_frequency.txt", std::ifstream::in);
   if (!frequencyfile.is_open ())
     {
       NS_LOG_UNCOND ( "THzSpectrumValueFactory::FreqBands: open data_frequency.txt failed" );
@@ -273,7 +276,7 @@ THzSpectrumValueFactory::FreqSeqEnd ()    // return the sequence number of the l
 {
   Ptr<SpectrumValue> f_store = Create <SpectrumValue> (m_THzSpectrumWaveform);
   std:: ifstream frequencyfile;
-  frequencyfile.open ("contrib/thz/model/data_frequency.txt", std::ifstream::in);
+  frequencyfile.open ("src/thz/model/data_frequency.txt", std::ifstream::in);
   if (!frequencyfile.is_open ())
     {
       NS_LOG_UNCOND ( "THzSpectrumValueFactory::FreqSeqEnd: open data_frequency.txt failed" );
@@ -323,7 +326,7 @@ Ptr<SpectrumValue>
 THzSpectrumValueFactory::CreateTxPowerSpectralDensity (double txPower)
 {
   std:: ifstream frequencyfile;
-  frequencyfile.open ("contrib/thz/model/data_frequency.txt", std::ifstream::in);
+  frequencyfile.open ("src/thz/model/data_frequency.txt", std::ifstream::in);
   if (!frequencyfile.is_open ())
     {
       NS_LOG_UNCOND ( "THzSpectrumValueFactory::CreateTxPowerSpectralDensity: open data_frequency.txt failed" );
@@ -458,7 +461,7 @@ THzSpectrumValueFactory::CreateAllPowerSpectralDensity (double n, double r, doub
 
   std:: ifstream frequencyfile;
   std:: ofstream myfile;
-  frequencyfile.open ("contrib/thz/model/data_frequency.txt", std::ifstream::in);
+  frequencyfile.open ("src/thz/model/data_frequency.txt", std::ifstream::in);
   if (!frequencyfile.is_open ())
     {
       NS_LOG_UNCOND ( "THzSpectrumValueFactory::CreateAllPowerSpectralDensity: open data_frequency.txt failed" );
