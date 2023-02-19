@@ -99,10 +99,10 @@ Building THz Module on ns-3-dev (instructions are for the new v1.1.1 version wit
     $ cd $NS3_DEV_HOME
     $ ./ns3 configure --enable-examples
     $ ./ns3
-    $ cp $THZ_HOME/examples/macro-central.cc $NS3_DEV_HOME/ns3.33/scratch/
+    $ cp $THZ_HOME/examples/macro-central.cc $NS3_DEV_HOME/scratch/
     $ ./ns3 run scratch/macro-central
 
-Optionally, run the example with customized arguments (example shown below)
+Optionally, run the example with customized arguments (example shown below)::
 
     $ ./ns3 run "scratch/macro-central --configuration=28 --nodeNum=50 seedNum=3"
 
