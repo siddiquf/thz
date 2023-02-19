@@ -90,7 +90,7 @@ Building THz Module on ns-3-dev (instructions are for the new v1.1.1 version wit
 
     $ cd $NS3_DEV_HOME
     $ git clone https://gitlab.com/nsnam/ns-3-dev.git
-* Now, clone the link-discovery branch of THz from the github repository inside $NS3_DEV_HOME/src/  ::
+* Now, clone the link-discovery branch of THz from the github repository inside $NS3_DEV_HOME/ns-3-dev/src/  ::
 
     $ git clone -b link-discovery https://github.com/siddiquf/thz.git
 
