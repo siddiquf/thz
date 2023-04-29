@@ -164,7 +164,23 @@ class THzDirectionalAntenna : public Object
      *
      * \brief calculate the directional antenna's gain of the transmitter [dB]
      */
-    double GetTxGainDb(Ptr<MobilityModel> senderMobility, Ptr<MobilityModel> recvMobility);
+double GetTxGainDb(Ptr<MobilityModel> senderMobility, Ptr<MobilityModel> recvMobility);
+
+  /**
+  * \param phi_zero initial angle in phi-plane
+  *
+  * \brief tune the orientation of the transmitter's directional antenna
+  */
+void TuneTxOrientation (double phi_zero);
+
+  /**
+  * \brief check the orientation of the transmitter's directional antenna based on time duration
+  *
+  * returns a orientation of smoothly turing directional antenna
+  */
+  double GetTxOrientation ();
+  
+    
 
     /**
      * \param XnodeMobility the mobility of one node of the node pair, which is denoted as X.
@@ -179,12 +195,24 @@ class THzDirectionalAntenna : public Object
      * Antenna mode = 0 corresponding to Directional transmitter.
      * Antenna mode = 2 corresponding to Omni-directional antenna.
      */
-    double GetAntennaGain(Ptr<MobilityModel> XnodeMobility,
+  /* double GetAntennaGain(Ptr<MobilityModel> XnodeMobility,
                           Ptr<MobilityModel> YnodeMobility,
                           bool XnodeMode,
                           bool YnodeMode,
-                          double RxorientationRadians);
+                          double RxorientationRadians);*/
+   double GetAntennaGain (Ptr<MobilityModel> XnodeMobility, Ptr<MobilityModel> YnodeMobility, bool XnodeMode, bool YnodeMode, double RxorientationRadians,double TxorientationRadians );
 
+
+  /**
+  * \param txTurnSpeed the turning speed of the transmitter directional antenna
+  *
+  * \brief set the turning speed of the directional antenna on the transmitter [circles/sec]
+  *
+  * transmitter's directional antenna periodically sweeps the entire area to discover AP.
+  */
+void SetTxTurningSpeed (double txTurnSpeed);
+
+  
   private:
     Ptr<THzNetDevice> m_device;
     Ptr<Node> m_node;
@@ -192,6 +220,7 @@ class THzDirectionalAntenna : public Object
     double m_RxTxMode;
 
     double m_turnSpeed;
+  double m_txTurnSpeed; //turn speed of tx antenna
     double m_RxIniAngle;
     double m_exponent;
     double m_beamwidthRadians;
@@ -199,6 +228,8 @@ class THzDirectionalAntenna : public Object
     double m_TxorientationDegrees;
     double m_RxorientationDegrees;
     double m_RxorientationRadians;
+  double m_TxIniAngle; //orientation angle of default transmitter (client)
+   double m_TxorientationRadians;
 
     double m_phi_tx;
     double m_maxGain;

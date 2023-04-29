@@ -158,6 +158,7 @@ class THzChannel : public Channel
     double m_noiseFloor;
     double m_Rxorientation;
     double m_totalGain;
+    double m_Txorientation[150]; //holds the orientation angles of all clients (default transmitters)
 
     double m_XnodeMode; //!< Antenna mode of the Xnode of the node pair (X-Y)
     double m_YnodeMode; //!< Antenna mode of the Ynode of the node pair (X-Y)
@@ -165,6 +166,7 @@ class THzChannel : public Channel
     Ptr<ConstantSpeedPropagationDelayModel> m_delay;
     Ptr<THzDirectionalAntenna> m_thzDA;
     Ptr<THzNetDevice> m_sendDev;
+  
 
     Address m_send_check;
     Mac48Address m_send_48_check;
