@@ -106,6 +106,11 @@ Building THz Module on ns-3-dev (instructions are for the new v1.1.1 version wit
 Optionally, run the example with customized arguments (example shown below)::
 
     $ ./ns3 run "scratch/macro-central --configuration=28 --nodeNum=50 seedNum=3"
+    
+The MATLAB scripts (CDF_plot_initial_discovery_and_rediscovery.m & box_plot_initial_discovery_and_rediscovery.m)  in thz/macro_postprocessing/ folder in this link-discovery branch can be used to reproduce the results in the following paper:
+Farhan Siddiqui and Bikash Mazumdar. 2023. Link Discovery Extension to ns-3’s Terahertz Communication Module. In 2023 Workshop on ns-3 (WNS3
+2023), June 28–29, 2023, Arlington, VA, USA. ACM, New York, NY, USA, 8 pages. https://doi.org/10.1145/3592149.3592153
+
 
 
 Helpers
