@@ -35,6 +35,7 @@ NS_OBJECT_ENSURE_REGISTERED(THzMacHeader);
 
 THzMacHeader::THzMacHeader()
 {
+  NS_LOG_UNCOND("THzMacHeader::THzMacHeader **");
 }
 
 THzMacHeader::THzMacHeader(const Mac48Address srcAddr, const Mac48Address dstAddr, uint8_t type)

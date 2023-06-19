@@ -196,16 +196,10 @@ class THzMacMacroClient : public THzMac
                                    double rxPower);
 
   private:
-    typedef enum
-    {
-        IDLE,
-        BACKOFF,
-        WAIT_TX,
-        TX,
-        WAIT_ACK,
-        RX,
-        COLL
-    } State;
+  typedef enum
+  {
+    IDLE, BACKOFF, WAIT_TX, TX, WAIT_ACK, RX, COLL, AP_DISCOVERY
+  } State;
 
     Time GetSifs(void) const;
     Time GetDifs(void) const;
@@ -397,11 +391,38 @@ class THzMacMacroClient : public THzMac
      */
     void ResultsRecord();
     void CollisionsRecord(uint16_t retry);
+  void RecordInstThroughput() ; //added
 
     /**
      * \brief record the positions into output file
      */
     void PositionsRecord();
+
+
+    /** Methods for rotating TX antenna **/
+  void TurnTxAntenna ();
+  void SectorTimeout ();
+
+  /**
+    * \brief records the time when client discovers the AP into output file
+    */
+  void DiscoveryTimeRecord ();
+
+  /**
+    * \brief called when link loss detection timer expires indicating link has been lost
+    */
+  void LinkTimeout () ;
+
+   /**
+    * \brief changes location of client nodes
+    */
+  void LocationChange () ;
+
+
+   /**
+    * \brief records the time taken to rediscover the AP into an output file
+    */
+  void ReDiscoveryTimeRecord (Time reDiscoveryTime); 
 
     Callback<void, Ptr<Packet>, Mac48Address, Mac48Address> m_forwardUpCb;
     Mac48Address m_address;
@@ -421,6 +442,8 @@ class THzMacMacroClient : public THzMac
     EventId m_sendAckEvent;
     EventId m_sendDataEvent;
     EventId m_SetRxAntennaEvent;
+    EventId m_LinkTimeoutEvent;  //link timeout
+   EventId m_sectorTimeoutEvent;
 
     // Mac parameters
     uint16_t m_boSlots;
@@ -450,6 +473,14 @@ class THzMacMacroClient : public THzMac
     Time m_boRemain;
     Time m_backoffStart;
 
+   Time m_tLink;              // link loss detection timeout value
+  Time time_cta_rcvd_2;      // records timestamp when a cta packet is received
+  Time cta_timestamp[5];     // cta arrival timestamps 
+  Time cta_time[4];          //stires the time interval between arriving ctas
+  int rounds;                // number of rounds rotated by client for each discovery
+  int ctaCount;              //records the number of cta packets received
+  double dir;
+
     Time m_tstart;
     Time m_tend;
     uint16_t m_seqRec;
@@ -460,6 +491,13 @@ class THzMacMacroClient : public THzMac
     double m_throughputavg;
     Mac48Address m_addRecS;
     int m_ite;
+  double m_angle;          // angle (orientation) of the transmitter antenna
+  Vector current_position; // current position of client node in terms of x,y coordinates
+  Vector new_position;     // new position of client node in terms of x,y coordinates after location change 
+  Time link_loss_time;     // time at which client - AP link alignment is lost due to location change
+  Time time_rediscovery;   // time at which client rediscovers the link via receipt of cta message
+  int  m_discovery_count;  // tracks how many times the client discovered the link (includes both actual link lost as well as immature timeouts)
+  double m_radius; //
 
     uint32_t m_queueLimit;
     std::list<Ptr<Packet>> m_pktQueue;
@@ -495,6 +533,9 @@ class THzMacMacroClient : public THzMac
     void InitVariables();
     double m_nSector;
     Time m_tCircle;
+  Time m_tMaxCircle; //added
+  double m_turningSpeed; //added
+
     Time m_tSector;
     uint16_t m_nodeId;
     std::string outputFile;

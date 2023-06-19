@@ -197,6 +197,7 @@ class THzPhyMacro : public THzPhy
      * \return the value in Watt.
      */
     double DbmToW(double dbm);
+  void SINRRecord (double sinr); //added
 
   private:
     typedef enum
@@ -237,6 +238,8 @@ class THzPhyMacro : public THzPhy
     double m_dataRate8SPK;
     double m_dataRate16QAM;
     double m_dataRate64QAM;
+  double sinr_value; //added
+
 
     std::list<OngoingRx> m_ongoingRx;
 

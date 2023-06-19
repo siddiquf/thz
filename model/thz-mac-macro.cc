@@ -72,6 +72,7 @@ THzMacMacro::THzMacMacro()
       m_pktData(0)
 
 {
+  NS_LOG_UNCOND("THzMacMacro::THzMacMacro **");
     m_cw = m_cwMin;
     m_nav = Simulator::Now();
     m_localNav = Simulator::Now();

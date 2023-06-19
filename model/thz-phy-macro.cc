@@ -53,9 +53,11 @@ THzPhyMacro::THzPhyMacro()
     : m_device(0),
       m_mac(0),
       m_channel(0),
-      m_pktRx(0)
+      m_pktRx(0),
+      sinr_value(0)
 
 {
+  NS_LOG_UNCOND("THzPhyMacro::THzPhyMacro **");
     m_csBusy = false;
     m_csBusyEnd = Seconds(0);
     m_state = IDLE;
@@ -139,6 +141,7 @@ THzPhyMacro::GetTypeId(void)
                                           DoubleValue(210.24e9),
                                           MakeDoubleAccessor(&THzPhyMacro::m_dataRate16QAM),
                                           MakeDoubleChecker<double>())
+                            
                             .AddAttribute("DataRate64QAM",
                                           "Transmission Rate (bps) for Data Packets",
                                           DoubleValue(315.52e9),
@@ -363,6 +366,8 @@ THzPhyMacro::ReceivePacketDone(Ptr<Packet> packet, double rxPower)
         double rxPowerW = m_channel->DbmToW(rxPower);
         double sinr = rxPowerW / noiseW;
         double sinrDb = 10 * std::log10(sinr);
+        sinr_value = sinr;
+        //Simulator::ScheduleNow(&THzPhyMacro::SINRRecord, this,sinr);
         NS_LOG_DEBUG("SINR = " << sinrDb << " dB; SINR TH = " << m_sinrTh << " dB");
         // ADD: CHANGE STATUS
         m_state = IDLE;
@@ -376,6 +381,7 @@ THzPhyMacro::ReceivePacketDone(Ptr<Packet> packet, double rxPower)
         }
         else
         {
+          NS_LOG_UNCOND("sinrDb < m_sinrTh");
             m_mac->ReceivePacketDone(this, packet, false, rxPower);
         }
 
@@ -418,6 +424,22 @@ THzPhyMacro::DbmToW(double dbm)
 {
     double mw = pow(10.0, dbm / 10.0);
     return mw / 1000.0;
+}
+
+  void
+THzPhyMacro::SINRRecord (double sinr)
+{
+  NS_LOG_UNCOND("In SINR Record function ");
+   std::stringstream txtname;
+   txtname << "contrib/thz/results/SINRRecord_" << m_device->GetNode()->GetId();
+   std::string filename = txtname.str ();
+
+   std::ofstream resultfile;
+   resultfile.open (filename.c_str (), std::ios::app);
+   resultfile << Simulator::Now().GetNanoSeconds() << "\t" << sinr << std::endl;
+   resultfile.close ();
+   return;
+
 }
 
 } // namespace ns3

@@ -167,7 +167,8 @@ class THzMacMacroAp : public THzMac
         TX,
         WAIT_ACK,
         RX,
-        COLL
+        COLL,
+        AP_DISCOVERY
     } State;
 
     Time GetSifs(void) const;
@@ -222,6 +223,8 @@ class THzMacMacroAp : public THzMac
      */
     void CycleRecord();
 
+   void SendData (); //added
+
     Callback<void, Ptr<Packet>, Mac48Address, Mac48Address> m_forwardUpCb;
     Mac48Address m_address;
     Ptr<THzPhy> m_phy;
@@ -242,6 +245,8 @@ class THzMacMacroAp : public THzMac
     // Mac parameters
     uint16_t m_boSlots;
     uint16_t m_retry;
+  uint16_t m_dataRetryLimit; //added
+  uint16_t m_sequence; //added
 
     Time m_slotTime;
     Time m_slotTime_3way;
@@ -339,6 +344,22 @@ class THzMacMacroAp : public THzMac
 
   protected:
 };
+
+    std::map<Mac48Address, std::list<Ptr<Packet> >> clientList; //added code
+
+   //the following struct added
+  typedef struct
+  {
+    uint16_t RecSeq;            //!< data packet's sequence number
+    Time RecTime;               //!< recording time
+    uint16_t RecSize;           //!< size of the data packet
+    uint16_t RecRetry;          //!< number of retransmittion
+    Ptr<Packet> Recpacket;      //!< the data packet been recorded
+    uint16_t BackoffLife;    //Number of CTS that the packet has to see before can be sent
+  } Rec;
+
+  
+
 
 } // namespace ns3
 

@@ -72,6 +72,7 @@ THzMacMacroAp::THzMacMacroAp()
       m_pktData(0)
 
 {
+  NS_LOG_UNCOND("THzMacMacroAp::THzMacMacroAp **");
     m_nav = Simulator::Now();
     m_localNav = Simulator::Now();
     m_backoffRemain = PicoSeconds(0);
@@ -216,10 +217,30 @@ THzMacMacroAp::GetTypeId(void)
     return tid;
 }
 
+//added code to the function Enqueue
 bool
-THzMacMacroAp::Enqueue(Ptr<Packet> packet, Mac48Address dest)
+THzMacMacroAp::Enqueue (Ptr<Packet> packet, Mac48Address dest)
 {
-    return false;
+  NS_LOG_UNCOND("packet received from upper layer at AP with address " << m_address << " of size " << packet->GetSize() << " for MAC destination " << dest);
+ packet->Print (std::cout);
+ std::cout << std::endl;
+
+  THzMacHeader header = THzMacHeader (m_address, dest, THZ_PKT_TYPE_DATA);
+      m_sequence++;
+      header.SetSequence (m_sequence);
+      packet->AddHeader (header);
+
+       std::map<Mac48Address, std::list<Ptr<Packet> >>::iterator citer = clientList.find(dest);
+       if (citer == clientList.end())
+        {
+          NS_LOG_UNCOND("Cannot find this mac in client list- cannot add packet to clientlist"); //this should not happen
+        }
+       else {
+         citer->second.push_back(packet);
+         NS_LOG_UNCOND("no. of packets in queue of " << citer->first << " is " <<  citer->second.size());
+       }
+ 
+ return false;
 }
 
 void
@@ -256,6 +277,7 @@ THzMacMacroAp::Init(void)
 void
 THzMacMacroAp::TurnRxAntenna(void)
 {
+    
     m_angle = m_angle + m_beamwidth; // add degrees for next turn
     while (m_angle <= -360)
     {
@@ -265,14 +287,16 @@ THzMacMacroAp::TurnRxAntenna(void)
     {
         m_dummyCycles++;
         m_angle -= 360;
-        CycleRecord();
+        //CycleRecord();
     }
 
     m_thzAD->TuneRxOrientation(m_angle); // turn to next sector
+    
 
     if (m_ways == 3)
     {
-        SendCta3(); // 3-way
+         //SendCta3();   // 3-way
+      SendData();
     }
     else
     {
@@ -544,16 +568,137 @@ THzMacMacroAp::ReceiveData(Ptr<Packet> packet)
 
     if (IsNewSequence(header.GetSource(), header.GetSequence()))
     {
+      NS_LOG_UNCOND("calling m_forwardUpCb at AP");
         m_forwardUpCb(packet, header.GetSource(), header.GetDestination());
     }
 }
 
 void
-THzMacMacroAp::ReceiveRts(Ptr<Packet> packet, double rxPower)
+THzMacMacroAp::ReceiveRts (Ptr<Packet> packet, double rxPower)
 {
-    NS_LOG_DEBUG("AP - RTS Received. Now: " << Simulator::Now());
-    m_rtsList.push_back(std::make_pair(packet, rxPower));
+  THzMacHeader head;
+  packet->PeekHeader (head);
+  Mac48Address addr = head.GetSource();
+  NS_LOG_UNCOND ("AP - RTS Received. Now: " << Simulator::Now() << " at node " << m_nodeId << " from node " << head.GetSource() << " at AP angle " << m_angle);
+  m_rtsList.push_back(std::make_pair(packet, rxPower));
+
+  bool already_exists = false;
+
+  
+  //added code begin
+  /*
+        if (m_sectorMap.find (m_angle) == m_sectorMap.end()) 
+        {
+          m_sectorMap.insert (std::make_pair (m_angle, std::vector<std::pair<Mac48Address, double>>())); // Create map entry for the sector
+        }
+        else {
+          //already_exists = false;
+          std::vector<std::pair<Mac48Address, double>>::iterator it2 = m_sectorMap[m_angle].begin();
+          for (; it2 != m_sectorMap[m_angle].end(); it2++)  
+          {
+              if (it2->first == head.GetSource())
+                {
+                  already_exists = true;
+                  break;
+                }
+           }
+        }
+          if (!already_exists)
+          {
+              std::vector<std::pair<Mac48Address, double>> sector_v;
+              int i,j;
+              for (auto i = m_sectorMap.begin(); i != m_sectorMap.end(); i++) {
+                double sector_angle = i->first;
+                
+                std::vector<std::pair<Mac48Address, double>>::iterator j = m_sectorMap[sector_angle].begin();
+                for (; j != m_sectorMap[sector_angle].end(); j++)  {
+            
+                  if (j->first == head.GetSource())
+                  {
+                    NS_LOG_UNCOND("mac address found in AP sector " << sector_angle );
+                    m_sectorMap[sector_angle].erase(j);
+                    NS_LOG_UNCOND("deleted pair from vector");
+                    if (m_sectorMap[sector_angle].size() == 0) {
+                      NS_LOG_UNCOND("vector size is 0 -- deleting map entry");
+                      m_sectorMap.erase(m_angle);
+                    }
+                  }
+                  
+                    break;
+                  }
+                }
+              
+              m_sectorMap[m_angle].push_back(std::make_pair(head.GetSource(), rxPower));
+              
+          }
+
+          */
+  /*
+          if (m_whiteList.find(m_angle) == m_whiteList.end())
+          {
+             m_whiteList.insert(std::make_pair(m_angle, std::vector<Mac48Address>()));
+          }
+
+          for (auto i = m_whiteList.begin(); i != m_whiteList.end(); i++) {
+            double sector_angle = i->first;
+            std::vector<Mac48Address>::iterator j = m_whiteList[sector_angle].begin();
+            for (; j != m_whiteList[sector_angle].end(); j++)  {
+                 if (j->first == head.GetSource())
+                  {
+                    NS_LOG_UNCOND("mac address found in AP sector " << sector_angle );
+                    m_whiteList[sector_angle].erase(j);
+                    NS_LOG_UNCOND("deleted mac address from client list in sector " << sector_angle);
+                    if (m_whiteList[sector_angle].size() == 0) {
+                      NS_LOG_UNCOND("vector size is 0 -- deleting map entry");
+                      m_whiteList.erase(m_angle);
+                    }
+                  }
+                  
+                    break;
+              
+            }
+         
+          }
+  */
+  double sector_angle = -99;
+    for (auto it = m_whiteList.begin(); it != m_whiteList.end(); ++it) {
+        sector_angle = it->first;
+        std::vector<Mac48Address>& v = it->second;
+        for (auto it2 = v.begin(); it2 != v.end(); ++it2) {
+            if (*it2 == head.GetSource() && m_angle == sector_angle) {
+                already_exists = true;
+                std::cout << "mac " <<  head.GetSource() << " already exists in the correct sector in the WL " << std::endl;
+                break;
+            }
+            else if (*it2 == head.GetSource() && m_angle != sector_angle) {
+               m_whiteList[sector_angle].erase(it2);
+               NS_LOG_UNCOND("erased from whitelist " << *it2);
+                if (m_whiteList[sector_angle].size() == 0) {
+                      NS_LOG_UNCOND("vector size is 0 -- deleting map entry");
+                      m_whiteList.erase(m_angle);
+                 }
+                break;
+            }
+            
+        }
+    }        
+
+    
+    if (!already_exists) {
+         
+      m_whiteList[m_angle].push_back(head.GetSource());   
+      NS_LOG_UNCOND ("Inserted node " << head.GetSource() << " into m_angle" << m_angle << " of white list ");
+    }
+
+     if (clientList.find(head.GetSource()) == clientList.end()) {
+      
+       clientList.insert(std::make_pair(head.GetSource(), std::list<Ptr<Packet> >()));
+     }
+     
+
+  //added code end
 }
+
 
 void
 THzMacMacroAp::SendAck()
@@ -789,6 +934,76 @@ THzMacMacroAp::SendFeedbackCTA(double angle, Mac48Address dest)
     SendPacket(packet, 0);
 }
 
+//new function added
+
+void
+THzMacMacroAp::SendData ()
+{
+  CycleRecord();
+   NS_LOG_UNCOND("THzMacMacroAp::SendData");
+   NS_LOG_UNCOND("Send one enqueued data packet (if any) down to PHY layer to be transmitted the client in this sector");
+   Time delay = Time(0);
+   
+   if(m_whiteList.find(m_angle) == m_whiteList.end()) {
+     NS_LOG_UNCOND ("This sector is not in the white list." << m_angle);  //this will occur for clients not in the whitelist
+   }
+   else {
+     NS_LOG_UNCOND ("This sector is in the white list." << m_angle);
+     for (auto it = m_whiteList.begin(); it != m_whiteList.end(); ++it) {
+        std::vector<Mac48Address>& v = it->second;
+        std::cout << "sector :" << it->first << "--- " ;
+        for (auto it2 = v.begin(); it2 != v.end(); ++it2) {
+          std::cout << " mac addr " << *it2 << " , ";
+        }
+        std::cout << std::endl;
+     }
+     std::map<double, std::vector<Mac48Address>>::iterator wit = m_whiteList.find(m_angle);
+     double sectorValue = wit->first;
+     NS_LOG_UNCOND("sector is " << sectorValue);
+     NS_LOG_UNCOND("no. of clients in this sector = " << wit->second.size());
+     std::vector<Mac48Address>::iterator vecIt =  wit->second.begin();
+     delay = Time(0);
+     for(; vecIt != wit->second.end(); vecIt++) { //for each mac client in this sector
+       
+       Mac48Address mac =  *vecIt; //in each iteration mac holds a specific mac address in the list of macs in one sector
+       NS_LOG_UNCOND("mac is " << mac);
+       std::map<Mac48Address, std::list<Ptr<Packet> >>::iterator clientIt = clientList.find(mac);
+       int packetCount = clientIt->second.size();
+       NS_LOG_UNCOND("no. of packets in " << mac  << " queue = " << packetCount);
+       if (packetCount > 0) {
+         Ptr<Packet> it =  clientIt->second.front();  //clientIt->second.back()? then empty list?;
+         THzMacHeader hd;
+         it->RemoveHeader(hd);
+         hd.SetSector(-1);
+         hd.SetType(THZ_PKT_TYPE_DATA);
+         it->AddHeader(hd);
+         NS_LOG_UNCOND("In SendData - sector value in packet is " << hd.GetSector());
+         if ( hd.GetType() == THZ_PKT_TYPE_DATA) {
+           NS_LOG_UNCOND("In SendData - Type value in packet is " << THZ_PKT_TYPE_DATA);
+         }
+         it->Print (std::cout);
+         std::cout << std::endl;
+    
+         NS_LOG_UNCOND("sending packet after a delay of " << delay);
+  
+         Simulator::Schedule(delay, &THzMacMacroAp::SendPacket, this, it, 0);
+         
+         delay = delay + GetDataDuration (m_packetSize, 0);// + GetMaxBackoff();
+         
+         clientIt->second.pop_front();
+         packetCount = clientIt->second.size();
+         NS_LOG_UNCOND("no. of packets in " << mac  << " queue now = " << packetCount);
+       
+         }      
+      } 
+   }
+ 
+ 
+   Simulator::Schedule(delay, &THzMacMacroAp::SendCta3, this);
+   NS_LOG_UNCOND("now called cta3 from Ap");
+   
+}
+
 // ------------------------ Set Functions -----------------------------
 void
 THzMacMacroAp::AttachPhy(Ptr<THzPhy> phy)
@@ -815,6 +1030,7 @@ THzMacMacroAp::SetAddress(Mac48Address addr)
 void
 THzMacMacroAp::SetForwardUpCb(Callback<void, Ptr<Packet>, Mac48Address, Mac48Address> cb)
 {
+  NS_LOG_UNCOND("THzMacMacroAp::SetForwardUpCb");
     m_forwardUpCb = cb;
 }
 
@@ -873,26 +1089,28 @@ THzMacMacroAp::GetDataDuration(uint32_t size, uint8_t mcs)
 }
 
 std::string
-THzMacMacroAp::StateToString(State state)
+THzMacMacroAp::StateToString (State state)
 {
-    switch (state)
+  switch (state)
     {
     case IDLE:
-        return "IDLE";
+      return "IDLE";
     case BACKOFF:
-        return "BACKOFF";
+      return "BACKOFF";
     case WAIT_TX:
-        return "WAIT_TX";
+      return "WAIT_TX";
     case TX:
-        return "TX";
+      return "TX";
     case WAIT_ACK:
-        return "WAIT_ACK";
+      return "WAIT_ACK";
     case RX:
-        return "RX";
+      return "RX";
     case COLL:
-        return "COLL";
+      return "COLL";
+      case AP_DISCOVERY:
+        return "AP_DISCOVERY";
     default:
-        return "??";
+      return "??";
     }
 }
 
@@ -929,17 +1147,18 @@ THzMacMacroAp::CycleRecord()
     /*----------------------------------------------------------------------------------------
      * enable cycle time printing in a .txt file by uncommenting the content in this function
      *----------------------------------------------------------------------------------------*/
-    /*
+    
        std::stringstream txtname;
-       txtname << "scratch/AP_cycle_" << outputFile;
+       txtname << "contrib/thz/results/AP_cycle_" << outputFile;
        std::string filename = txtname.str ();
 
        std::ofstream resultfile;
        resultfile.open (filename.c_str (), std::ios::app);
        resultfile << Simulator::Now().GetNanoSeconds() << std::endl;
+       //resultfile << Simulator::Now().GetPicoSeconds() << std::endl;
        resultfile.close ();
        return;
-      */
+      
 }
 
 } /* namespace ns3 */
