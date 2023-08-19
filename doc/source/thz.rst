@@ -11,6 +11,7 @@ THz system module is a software architecture for simulating configurable Teraher
 
 A detailed explanation of the module can be found in `TeraSim: An ns-3 extension to simulate Terahertz-band communication networks <https://doi.org/10.1016/j.nancom.2018.08.001>`_. Since release of v1.1, it also includes the `ADAPT <https://doi.org/10.1016/j.adhoc.2021.102540>`_ MAC protocol for the macroscale scenario.
 
+
 In this module, it tests the link-layer transmission performance of the nanoscale scenario with an adhoc network architecture and the macroscale scenario with a centralized network architecture. The following handshake protocols are implemented:
 
 * **Nanoscale scenario**: 0-way (ALOHA) and 2-way (CSMA)
@@ -21,7 +22,7 @@ Model Description
 
 The source code for the new module lives in the directory ``/thz``. This directory is typically placed in the ``contrib/`` directory of ns-3.
 
-* The frequency database file (data_frequency.txt) and the corresponding molecular absorption coefficient database file (data_AbsCoe.txt) are located inside ``/thz/model/``.
+* The frequency database file (data_frequency.txt) and the corresponding molecular absorption coefficient database file (data_AbsCoe.txt) are located inside ``/thz/model``.
 
 Design
 ======
@@ -39,39 +40,51 @@ Design
 * THzMacMacroClient: implements the 1-way and 3-way ADAPT protocols for the client node end.
 * THzDirectionalAntenna: is derived from ns-3 CosineAntennaModule class. The main extention in THzDirectional Antenna is enabling the turning ability.
 
+
+
 Scope and Limitations
 =====================
 
-* In its current state, the THz system module is adapt to the latest ns-3 version (ns-3.38)
-* As of now, the ns-3 interface to THz is IPv4 only.
+* In its current state, the THz system module is adapt to the latest ns-3 version (ns-3.33)
+* As of now, the ns-3 interface to THz is Ipv4 only.
 
 References
 ==========
 
-* Z. Hossain, Q. Xia, and J. M. Jornet, `TeraSim: An ns-3 extension to simulate Terahertz-band communication networks <https://doi.org/10.1016/j.nancom.2018.08.001>`_
-* D. Morales, J. M. Jornet, `ADAPT: An Adaptive Directional Antenna Protocol for medium access control in Terahertz communication networks <https://doi.org/10.1016/j.adhoc.2021.102540>`_
+* Z.Hossain, Q.Xia, and J.M.Jornet, `TeraSim: An ns-3 extension to simulate Terahertz-band communication networks <https://doi.org/10.1016/j.nancom.2018.08.001>`_
+* D.Morales, J.M.Jornet, `ADAPT: An Adaptive Directional Antenna Protocol for medium access control in Terahertz communication networks <https://doi.org/10.1016/j.adhoc.2021.102540>`_
+
 
 Usage
 *****
 
-Building THz Module
-===================
-The first step is to clone THz from the github repository::
+Building THz Module on ns-3-dev
+===============================
+* The first step is to clone NS3-DEV inside ``$NS3_DEV_HOME`` ::
 
- $ git clone https://github.com/UN-Lab/thz.git
+    $ cd $NS3_DEV_HOME
+    $ git clone https://gitlab.com/nsnam/ns-3-dev.git
+* Now, clone the ld-downlink branch of THz from the github repository  ::
 
-Copy the thz folder to your local source folder of ns-3 directory (../ns-3.38/contrib/), then go back to ns-3.38 folder to build the THz module by::
+    $ cd $NS3_DEV_HOME/ns-3-dev/src/ 
+    $ git clone -b ld-downlink https://github.com/siddiquf/thz.git
 
- $ ./ns3 configure --enable-examples --enable-tests
- $ ./ns3 build
+* Build and install TeraSim ::
 
-Once THz has been built successfully, try to run one of the examples (i.e., thz-macro-central.cc)::
+    $ cd $NS3_DEV_HOME/ns-3-dev
+    $ ./ns3 configure --enable-examples
+    $ ./ns3
+    $ cp $NS3_DEV_HOME/ns-3-dev/src/thz/thz-macro-central-new.cc $NS3_DEV_HOME/ns-3-dev/scratch
+    $ ./ns3 run scratch/thz-macro-central-new
 
- $ ./ns3 run thz-macro-central
+Optionally, run the example with customized arguments (example shown below)::
 
-Optionally, run the example with customized argurments::
+    $ ./ns3 run "scratch/thz-macro-central-new --nodeNum=50 --seedNum=1 --transportProtocol=2 --configuration=29 --interArrivalTime=500"
+    
+The MATLAB scripts (compute_metrics_modified.m, Avg_AP_cycle_computation.m, Throughput_comparison_graph.m, AP_Cycle_Time_comparison_graph.m)  in thz/results/ folder in the thz/ld-downlink branch can be used to reproduce the results in the following paper:
 
- $ ./ns3 run 'thz-macro-central --nodeNum=50 --interArrivalTime=200 --way=3'
+Farhan Siddiqui. 2023. Enabling TCP Communication over Terahertz Links: An Extension to ns-3’s TeraSim Module. In 3rd ACM Workshop on 5G and Beyond Network Measurements, Modeling, and Use Cases (5G-MeMU ’23), September 10, 2023, New York, NY, USA. ACM, New York, NY, USA, 7 pages. https://doi.org/10.1145/3609382.3610513
+
 
 Helpers
 =======
@@ -147,6 +160,7 @@ Basically every THz-class in THz module holds attributs. Some key attributes fro
   * MaxGain: The gain (dB) at the antenna boresight (the direction of maximum gain)
   * TurningSpeed: The turning speed of the Rx antenna unit in circles per second
 
+
 Output
 ======
 
@@ -156,15 +170,21 @@ The link layer performance in terms of the throughput and the discarding probabi
 
 In the case of macroscale scenario with the ADAPT procotol, the output is a TXT file with an entry for each packet with the format (client_id, packet_size, packet_delay, success, discard). This can be then postprocessed to obtain the desired metrics, such as throughput or discard rate, both overall and per node. A MATALB script is provided in ``/thz/macro_postprocessing/compute_metrics.m``.
 
+In the case of v1.1.1 (ADAPT with added link discovery extension), TXT files are generated for initial discovery time and for rediscovery time. The initial discovery time files contain an entry for each node that discovers the AP with the format (cliend_id, number_of_rotations_of client_antenna, client_antenna_orientation_at_discovery, discovery_time (in nanosec)). The rediscovery time files contain an entry for each node that rediscovers the AP with the format (client_id, rediscovery_time (in nanosec). Two different MATLAB scripts (box_plot_initial_discovery_and_rediscovery.m and CDF_plot_initial_discovery_and_rediscovery.m are provided that can generate the box plot and CDF of initial discovery and rediscovery time recorded for 10 trials. Number of trials can be altered as desired.
+
 Examples
 ===============
 The following examples have been written, which can be found in ``/thz/examples/``:
 
-* thz-nano-adhoc.cc: This example file is for the nanoscale scenario of the THz-band communication networks, i.e., with transmission distance below one meter. It outputs the link layer performance mainly in terms of the throughput and the discarding probability  of the DATA packets. In this example, an adhoc network architecture is implemented. User can set network topology in this file. The nodes in the nanonetwork are equipped with the energy module we developed. The basic parameters of the energy model can be set in this file. User can also set the number of samples of the TSOOK pulse within frequency range 0.9-4 THz window in this file. User can select one of the two MAC protocols that include a 0-way and a 2-way handshake protocols.  0-way starts the link layer transmission with a DATA frame and 2-way with an RTS frame. The selection can be done by setting the attribute value of EnableRts in THzMacNano. In the end, the user can also set the generated packet size and the mean value of the packet generation interval in this file.
+* nano-adhoc.cc: This example file is for the nanoscale scenario of the THz-band communication networks, i.e., with transmission distance below one meter. It outputs the link layer performance mainly in terms of the throughput and the discarding probability  of the DATA packets. In this example, an adhoc network architecture is implemented. User can set network topology in this file. The nodes in the nanonetwork are equipped with the energy module we developed. The basic parameters of the energy model can be set in this file. User can also set the number of samples of the TSOOK pulse within frequency range 0.9-4 THz window in this file. User can select one of the two MAC protocols that include a 0-way and a 2-way handshake protocols.  0-way starts the link layer transmission with a DATA frame and 2-way with an RTS frame. The selection can be done by setting the attribute value of EnableRts in THzMacNano. In the end, the user can also set the generated packet size and the mean value of the packet generation interval in this file.
 
-* thz-macro-central.cc: This example file is for the macroscale scenario of the THz-band communication networks, i.e., with transmission distance larger than several meters. A centralized network architecture is implemented. A high speed turning directional antenna is used in the base station (Servernodes), while all clients (Clientnodes) point the directional antennas towards the receiver. Important parameters:
+* macro-central.cc: This example file is for the macroscale scenario of the THz-band communication networks, i.e., with transmission distance larger than several meters. A centralized network architecture is implemented. A high speed turning directional antenna is used in the base station (Servernodes), while all clients (Clientnodes) point the directional antennas towards the receiver. 
 
-  * ``configuration``: sets the frequency window used, the number of sectors and modulation used.
+* v1.1.1 macro-central.cc: A high speed turning directional antenna is used in both the base station and the client. Link discovery is performed  by clients to discover the AP and be able to transmit data.
+
+Important parameters:
+
+  * ``configuration``: sets the beamwidth, the number of sectors and modulation used.
   * ``handshake_ways``: use a 0-, 1-, 2- or 3-way handshake. (0: CSMA, 1: ADAPT-1, 2: CSMA/CA, 3: ADAPT-3)
   * ``nodeNum``: number of client nodes
   * ``interArrivalTime``: average time between two packets arriving at client's queue
@@ -174,9 +194,9 @@ Validation
 
 This model has been tested validated by the results generated from the following test files, which can be found in ``/thz/test``:
 
-* The test files ``thz-psd-macro.cc`` and ``thz-psd-nano.cc`` are used to plot the power spectral densities of the generated waveform by the physical layer and the received signal at certain distance for macroscale scenario and nanoscale scenario respectively.
-* The test file ``thz-directional-antenna.cc`` plots the antenna radiation pattern of the directional antenna.
-* The test file ``thz-path-loss.cc`` plots the path loss as a function of distance.
+* The test files ``test-thz-psd-macro.cc`` and ``test-thz-psd-nano.cc`` are used to plot the power spectral densities of the generated waveform by the physical layer and the received signal at certain distance for macroscale scenario and nanoscale scenario respectively.
+* The test file ``test-directional-antenna.cc`` plots the antenna radiation pattern of the directional antenna.
+* The test file ``test-thz-path-loss.cc`` plots the path loss as a function of distance.
 
 Copy Right
 **********
